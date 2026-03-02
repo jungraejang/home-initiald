@@ -1,6 +1,6 @@
 {
   "network": {
-    "pi_host": "192.168.4.1",
+    "pi_host": "192.168.0.102",
     "pi_port": 5005,
     "listen_host": "0.0.0.0",
     "listen_port": 5005,
@@ -10,6 +10,7 @@
     "steer_axis": 0,
     "throttle_axis": 2,
     "brake_axis": 3,
+    "require_deadman": false,
     "deadman_button": 4,
     "estop_button": 1,
     "reset_estop_button": 2,

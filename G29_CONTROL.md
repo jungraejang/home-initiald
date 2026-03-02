@@ -28,6 +28,7 @@ Copy `g29_control/config.example.json` to `g29_control/config.json`, then edit:
 - `network.pi_host`: your Pi IP address
 - `network.pi_port` and `network.listen_port`: keep same value on both sides
 - `input.*`: axis/button mapping for your G29
+- `input.require_deadman`: set `true` for hold-to-drive safety, `false` for quick bench testing
 
 ## 3) Start receiver on Raspberry Pi
 
@@ -52,7 +53,7 @@ Use calibration output to update `input.axis_min` / `input.axis_max`.
 ## Safety behavior
 
 - If no valid packet arrives for `timeout_ms`, the Pi stops the motors.
-- If deadman button is not pressed, the Pi stops the motors.
+- If `input.require_deadman=true` and deadman button is not pressed, the Pi stops the motors.
 - If e-stop button is pressed once, receiver latches stop mode.
 - To clear latched e-stop, press reset-e-stop button while holding deadman.
 

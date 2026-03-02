@@ -1,4 +1,5 @@
 import argparse
+import os
 import socket
 import sys
 import time
@@ -13,6 +14,11 @@ if str(ROOT) not in sys.path:
 
 from g29_control.config import load_config
 from g29_control.protocol import ControlPacket
+
+
+if sys.platform.startswith("win"):
+    # Improve wheel detection reliability on Windows SDL backend.
+    os.environ.setdefault("SDL_JOYSTICK_RAWINPUT", "1")
 
 
 def clamp(value: float, lo: float, hi: float) -> float:
@@ -41,23 +47,65 @@ def map_axis_01(raw: float, axis_min: float, axis_max: float, invert: bool) -> f
     return scaled
 
 
-def find_g29_joystick() -> pygame.joystick.Joystick:
+def get_button_safe(joystick: pygame.joystick.Joystick, button_index: int, default: bool = False) -> bool:
+    if button_index < 0 or button_index >= joystick.get_numbuttons():
+        return default
+    return bool(joystick.get_button(button_index))
+
+
+def list_joysticks() -> list[tuple[int, str]]:
+    pygame.joystick.quit()
     pygame.joystick.init()
-    joystick_count = pygame.joystick.get_count()
-    if joystick_count == 0:
-        raise RuntimeError("No joystick/game controller detected.")
-    preferred = None
-    for idx in range(joystick_count):
+    pygame.event.pump()
+    devices = []
+    for idx in range(pygame.joystick.get_count()):
         js = pygame.joystick.Joystick(idx)
         js.init()
-        name = js.get_name().lower()
-        if "g29" in name or ("logitech" in name and "wheel" in name):
-            preferred = js
-            break
-    if preferred is None:
-        preferred = pygame.joystick.Joystick(0)
-        preferred.init()
-    return preferred
+        devices.append((idx, js.get_name()))
+    return devices
+
+
+def find_g29_joystick(wait_seconds: float = 8.0, device_index: int | None = None) -> pygame.joystick.Joystick:
+    deadline = time.monotonic() + max(0.0, wait_seconds)
+    warned_waiting = False
+    while True:
+        devices = list_joysticks()
+        if devices:
+            if device_index is not None:
+                if 0 <= device_index < len(devices):
+                    js = pygame.joystick.Joystick(device_index)
+                    js.init()
+                    return js
+                raise RuntimeError(
+                    f"--device-index {device_index} is invalid. Found {len(devices)} device(s): {devices}"
+                )
+
+            preferred_index = None
+            for idx, name in devices:
+                lname = name.lower()
+                if "g29" in lname or "driving force" in lname or ("logitech" in lname and "wheel" in lname):
+                    preferred_index = idx
+                    break
+            if preferred_index is None:
+                preferred_index = devices[0][0]
+            js = pygame.joystick.Joystick(preferred_index)
+            js.init()
+            return js
+
+        if time.monotonic() >= deadline:
+            raise RuntimeError(
+                "No joystick/game controller detected by SDL/pygame.\n"
+                "Checks:\n"
+                "1) Connect wheel USB directly (avoid hub), power on wheel.\n"
+                "2) Set G29 mode switch to PS4 (or test PS3 if needed).\n"
+                "3) Confirm in Windows 'Set up USB game controllers' that the wheel appears.\n"
+                "4) Close apps that may lock the device and rerun with --wait-seconds 15.\n"
+                "5) Run with --list-devices to inspect what pygame sees."
+            )
+        if not warned_waiting:
+            print("Waiting for joystick detection...")
+            warned_waiting = True
+        time.sleep(0.5)
 
 
 def calibrate(joystick: pygame.joystick.Joystick, seconds: float) -> Tuple[dict, dict]:
@@ -85,6 +133,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="G29 UDP sender for Raspberry Pi RC car")
     parser.add_argument("--config", default=str(ROOT / "g29_control" / "config.json"))
     parser.add_argument("--calibrate-seconds", type=float, default=0.0)
+    parser.add_argument("--wait-seconds", type=float, default=8.0)
+    parser.add_argument("--device-index", type=int, default=None)
+    parser.add_argument("--list-devices", action="store_true")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -93,7 +144,18 @@ def main() -> None:
     log_cfg = cfg["logging"]
 
     pygame.init()
-    joystick = find_g29_joystick()
+    if args.list_devices:
+        devices = list_joysticks()
+        if not devices:
+            print("No joystick devices detected by pygame.")
+        else:
+            print("Detected joystick devices:")
+            for idx, name in devices:
+                print(f"  [{idx}] {name}")
+        pygame.quit()
+        return
+
+    joystick = find_g29_joystick(wait_seconds=args.wait_seconds, device_index=args.device_index)
     print(f"Using controller: {joystick.get_name()}")
     print(f"Axes={joystick.get_numaxes()} Buttons={joystick.get_numbuttons()}")
 
@@ -141,9 +203,18 @@ def main() -> None:
                 bool(inp["invert_brake"]),
             )
 
-            deadman = bool(joystick.get_button(int(inp["deadman_button"])))
-            estop = bool(joystick.get_button(int(inp["estop_button"])))
-            reset_estop = bool(joystick.get_button(int(inp["reset_estop_button"])))
+            require_deadman = bool(inp.get("require_deadman", True))
+            deadman_button = int(inp.get("deadman_button", 4))
+            estop_button = int(inp.get("estop_button", 1))
+            reset_estop_button = int(inp.get("reset_estop_button", 2))
+
+            deadman = (
+                get_button_safe(joystick, deadman_button, default=False)
+                if require_deadman
+                else True
+            )
+            estop = get_button_safe(joystick, estop_button, default=False)
+            reset_estop = get_button_safe(joystick, reset_estop_button, default=False)
 
             packet = ControlPacket.create(
                 seq=seq,

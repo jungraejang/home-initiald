@@ -16,6 +16,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "steer_axis": 0,
         "throttle_axis": 2,
         "brake_axis": 3,
+        "require_deadman": True,
         "deadman_button": 4,
         "estop_button": 1,
         "reset_estop_button": 2,
