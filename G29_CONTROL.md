@@ -63,6 +63,15 @@ Use calibration output to update `input.axis_min` / `input.axis_max`.
 - `left = speed + steer_gain * steer`
 - `right = speed - steer_gain * steer`
 - Applied as `set_motor_model(left, left, right, right)` with PWM clamping
+- When `|speed|` is very small but steering is commanded, receiver applies in-place turn assist.
+
+### Latency and steering tuning
+
+- Increase `network.hz` (for example `80`) to reduce command interval.
+- `mapping.min_effective_pwm`: minimum non-zero PWM to overcome motor deadband.
+- `mapping.in_place_speed_threshold`: below this speed, allow turn-in-place mode.
+- `mapping.in_place_steer_threshold`: ignore tiny steering noise near center.
+- `mapping.in_place_turn_pwm`: turn-in-place strength.
 
 ## Tuning checklist
 

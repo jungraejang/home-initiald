@@ -6,11 +6,11 @@ from typing import Any, Dict
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "network": {
-        "pi_host": "192.168.4.1",
+        "pi_host": "192.168.0.102",
         "pi_port": 5005,
         "listen_host": "0.0.0.0",
         "listen_port": 5005,
-        "hz": 50,
+        "hz": 80,
     },
     "input": {
         "steer_axis": 0,
@@ -30,6 +30,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "mapping": {
         "max_pwm": 2800,
         "steer_gain": 0.7,
+        "min_effective_pwm": 700,
+        "in_place_speed_threshold": 0.08,
+        "in_place_steer_threshold": 0.08,
+        "in_place_turn_pwm": 1400,
     },
     "safety": {
         "timeout_ms": 350,

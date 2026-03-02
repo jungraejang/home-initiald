@@ -18,16 +18,48 @@ def clamp(value: float, lo: float, hi: float) -> float:
 
 
 class BasicDriveMapper:
-    def __init__(self, max_pwm: int, steer_gain: float):
+    def __init__(
+        self,
+        max_pwm: int,
+        steer_gain: float,
+        min_effective_pwm: int = 0,
+        in_place_speed_threshold: float = 0.08,
+        in_place_steer_threshold: float = 0.08,
+        in_place_turn_pwm: int = 1200,
+    ):
         self.max_pwm = int(max_pwm)
         self.steer_gain = float(steer_gain)
+        self.min_effective_pwm = max(0, int(min_effective_pwm))
+        self.in_place_speed_threshold = max(0.0, float(in_place_speed_threshold))
+        self.in_place_steer_threshold = max(0.0, float(in_place_steer_threshold))
+        self.in_place_turn_pwm = max(0, int(in_place_turn_pwm))
+
+    def _apply_min_effective(self, pwm: int) -> int:
+        if pwm == 0 or self.min_effective_pwm <= 0:
+            return pwm
+        if abs(pwm) < self.min_effective_pwm:
+            return self.min_effective_pwm if pwm > 0 else -self.min_effective_pwm
+        return pwm
 
     def compute_motor_duty(self, packet: ControlPacket) -> tuple[int, int, int, int]:
         speed = packet.throttle - packet.brake
-        left = clamp(speed + self.steer_gain * packet.steer, -1.0, 1.0)
-        right = clamp(speed - self.steer_gain * packet.steer, -1.0, 1.0)
-        left_pwm = int(round(left * self.max_pwm))
-        right_pwm = int(round(right * self.max_pwm))
+        steer = packet.steer
+
+        # Turn-in-place assist: if speed command is near zero but steering is commanded,
+        # drive wheels in opposite directions so the car can rotate on the spot.
+        if abs(speed) < self.in_place_speed_threshold and abs(steer) > self.in_place_steer_threshold:
+            turn_pwm = int(round(abs(steer) * self.in_place_turn_pwm))
+            turn_pwm = self._apply_min_effective(turn_pwm)
+            if steer > 0:
+                left_pwm, right_pwm = turn_pwm, -turn_pwm
+            else:
+                left_pwm, right_pwm = -turn_pwm, turn_pwm
+            return left_pwm, left_pwm, right_pwm, right_pwm
+
+        left = clamp(speed + self.steer_gain * steer, -1.0, 1.0)
+        right = clamp(speed - self.steer_gain * steer, -1.0, 1.0)
+        left_pwm = self._apply_min_effective(int(round(left * self.max_pwm)))
+        right_pwm = self._apply_min_effective(int(round(right * self.max_pwm)))
         return left_pwm, left_pwm, right_pwm, right_pwm
 
 
@@ -51,12 +83,20 @@ def main() -> None:
     timeout_s = max(0.05, float(safety["timeout_ms"]) / 1000.0)
     print_every_n = max(1, int(log_cfg["print_every_n"]))
 
-    mapper = BasicDriveMapper(max_pwm=int(mapping["max_pwm"]), steer_gain=float(mapping["steer_gain"]))
+    mapper = BasicDriveMapper(
+        max_pwm=int(mapping["max_pwm"]),
+        steer_gain=float(mapping["steer_gain"]),
+        min_effective_pwm=int(mapping.get("min_effective_pwm", 0)),
+        in_place_speed_threshold=float(mapping.get("in_place_speed_threshold", 0.08)),
+        in_place_steer_threshold=float(mapping.get("in_place_steer_threshold", 0.08)),
+        in_place_turn_pwm=int(mapping.get("in_place_turn_pwm", 1200)),
+    )
     car = Ordinary_Car()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8192)
     sock.bind((listen_host, listen_port))
-    sock.settimeout(0.05)
+    sock.setblocking(False)
     print(f"Listening on {listen_host}:{listen_port}, timeout={timeout_s:.3f}s")
 
     last_packet_time = 0.0
@@ -75,22 +115,38 @@ def main() -> None:
                     stopped_by_timeout = True
                     print("Failsafe stop: packet timeout")
 
-            try:
-                raw, source = sock.recvfrom(2048)
-            except socket.timeout:
+            latest_packet = None
+            malformed_count = 0
+
+            # Drain UDP queue and keep the latest valid packet only.
+            while True:
+                try:
+                    raw, source = sock.recvfrom(2048)
+                except BlockingIOError:
+                    break
+                except OSError:
+                    break
+
+                try:
+                    packet = decode_packet(raw)
+                except Exception:
+                    malformed_count += 1
+                    continue
+
+                if packet.seq <= last_seq:
+                    continue
+                latest_packet = packet
+
+            if latest_packet is None:
+                if malformed_count > 0:
+                    stop_car(car)
+                    print(f"Dropped {malformed_count} malformed packet(s)")
+                time.sleep(0.001)
                 continue
 
             stopped_by_timeout = False
             last_packet_time = time.monotonic()
-            try:
-                packet = decode_packet(raw)
-            except Exception as exc:
-                stop_car(car)
-                print(f"Dropped malformed packet from {source}: {exc}")
-                continue
-
-            if packet.seq <= last_seq:
-                continue
+            packet = latest_packet
             last_seq = packet.seq
             packet_count += 1
 
