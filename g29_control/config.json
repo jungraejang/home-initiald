@@ -1,0 +1,41 @@
+{
+  "network": {
+    "pi_host": "192.168.4.1",
+    "pi_port": 5005,
+    "listen_host": "0.0.0.0",
+    "listen_port": 5005,
+    "hz": 50
+  },
+  "input": {
+    "steer_axis": 0,
+    "throttle_axis": 2,
+    "brake_axis": 3,
+    "deadman_button": 4,
+    "estop_button": 1,
+    "reset_estop_button": 2,
+    "invert_steer": false,
+    "invert_throttle": true,
+    "invert_brake": true,
+    "deadzone": 0.05,
+    "axis_min": {
+      "steer": -1.0,
+      "throttle": -1.0,
+      "brake": -1.0
+    },
+    "axis_max": {
+      "steer": 1.0,
+      "throttle": 1.0,
+      "brake": 1.0
+    }
+  },
+  "mapping": {
+    "max_pwm": 2800,
+    "steer_gain": 0.7
+  },
+  "safety": {
+    "timeout_ms": 350
+  },
+  "logging": {
+    "print_every_n": 20
+  }
+}
