@@ -32,6 +32,8 @@
   "mapping": {
     "max_pwm": 2800,
     "steer_gain": 0.7,
+    "forward_steer_boost": 0.7,
+    "max_steer_gain": 1.2,
     "min_effective_pwm": 700,
     "in_place_speed_threshold": 0.08,
     "in_place_steer_threshold": 0.08,

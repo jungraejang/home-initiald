@@ -72,6 +72,8 @@ Use calibration output to update `input.axis_min` / `input.axis_max`.
 - `mapping.in_place_speed_threshold`: below this speed, allow turn-in-place mode.
 - `mapping.in_place_steer_threshold`: ignore tiny steering noise near center.
 - `mapping.in_place_turn_pwm`: turn-in-place strength.
+- `mapping.forward_steer_boost`: adds steering authority as forward speed increases.
+- `mapping.max_steer_gain`: caps boosted steering gain to keep control stable.
 
 ## Tuning checklist
 

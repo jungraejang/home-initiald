@@ -22,6 +22,8 @@ class BasicDriveMapper:
         self,
         max_pwm: int,
         steer_gain: float,
+        forward_steer_boost: float = 0.0,
+        max_steer_gain: float = 1.3,
         min_effective_pwm: int = 0,
         in_place_speed_threshold: float = 0.08,
         in_place_steer_threshold: float = 0.08,
@@ -29,6 +31,8 @@ class BasicDriveMapper:
     ):
         self.max_pwm = int(max_pwm)
         self.steer_gain = float(steer_gain)
+        self.forward_steer_boost = max(0.0, float(forward_steer_boost))
+        self.max_steer_gain = max(0.0, float(max_steer_gain))
         self.min_effective_pwm = max(0, int(min_effective_pwm))
         self.in_place_speed_threshold = max(0.0, float(in_place_speed_threshold))
         self.in_place_steer_threshold = max(0.0, float(in_place_steer_threshold))
@@ -56,8 +60,13 @@ class BasicDriveMapper:
                 left_pwm, right_pwm = -turn_pwm, turn_pwm
             return left_pwm, left_pwm, right_pwm, right_pwm
 
-        left = clamp(speed + self.steer_gain * steer, -1.0, 1.0)
-        right = clamp(speed - self.steer_gain * steer, -1.0, 1.0)
+        active_steer_gain = self.steer_gain
+        if speed > self.in_place_speed_threshold and self.forward_steer_boost > 0.0:
+            active_steer_gain *= 1.0 + self.forward_steer_boost * speed
+            active_steer_gain = min(active_steer_gain, self.max_steer_gain)
+
+        left = clamp(speed + active_steer_gain * steer, -1.0, 1.0)
+        right = clamp(speed - active_steer_gain * steer, -1.0, 1.0)
         left_pwm = self._apply_min_effective(int(round(left * self.max_pwm)))
         right_pwm = self._apply_min_effective(int(round(right * self.max_pwm)))
         return left_pwm, left_pwm, right_pwm, right_pwm
@@ -86,6 +95,8 @@ def main() -> None:
     mapper = BasicDriveMapper(
         max_pwm=int(mapping["max_pwm"]),
         steer_gain=float(mapping["steer_gain"]),
+        forward_steer_boost=float(mapping.get("forward_steer_boost", 0.0)),
+        max_steer_gain=float(mapping.get("max_steer_gain", 1.3)),
         min_effective_pwm=int(mapping.get("min_effective_pwm", 0)),
         in_place_speed_threshold=float(mapping.get("in_place_speed_threshold", 0.08)),
         in_place_steer_threshold=float(mapping.get("in_place_steer_threshold", 0.08)),
