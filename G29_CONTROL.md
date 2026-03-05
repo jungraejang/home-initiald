@@ -78,8 +78,15 @@ Modes:
 - `--role pi`: starts `Server/g29_receiver.py` + `Server/camera_stream_server.py`
 - `--role pc`: starts `Client/g29_sender.py` + `Client/camera_stream_client.py`
 - `--role all`: starts everything on one machine (debug/testing only)
+- `--no-camera`: run control only (skip camera processes)
 
 Press `Ctrl+C` in the master terminal to stop all child processes together.
+
+If camera viewer fails with `No module named 'cv2'`, install on PC:
+
+```bash
+python -m pip install opencv-python
+```
 
 Optional calibration readout:
 

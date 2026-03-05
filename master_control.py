@@ -4,10 +4,17 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_CONFIG = str(ROOT / "g29_control" / "config.json")
+
+
+class ProcessSpec(NamedTuple):
+    name: str
+    command: list[str]
+    required: bool
 
 
 def launch_process(command: list[str], name: str) -> subprocess.Popen:
@@ -31,25 +38,39 @@ def stop_processes(processes: list[tuple[str, subprocess.Popen]]) -> None:
                 proc.kill()
 
 
-def role_commands(role: str, config: str) -> list[tuple[str, list[str]]]:
+def role_commands(role: str, config: str, no_camera: bool) -> list[ProcessSpec]:
     py = sys.executable
     if role == "pc":
-        return [
-            ("g29_sender", [py, "Client/g29_sender.py", "--config", config]),
-            ("camera_viewer", [py, "Client/camera_stream_client.py", "--config", config]),
+        specs = [
+            ProcessSpec("g29_sender", [py, "Client/g29_sender.py", "--config", config], True),
         ]
+        if not no_camera:
+            specs.append(
+                ProcessSpec("camera_viewer", [py, "Client/camera_stream_client.py", "--config", config], False)
+            )
+        return specs
     if role == "pi":
-        return [
-            ("g29_receiver", [py, "Server/g29_receiver.py", "--config", config]),
-            ("camera_server", [py, "Server/camera_stream_server.py", "--config", config]),
+        specs = [
+            ProcessSpec("g29_receiver", [py, "Server/g29_receiver.py", "--config", config], True),
         ]
+        if not no_camera:
+            specs.append(
+                ProcessSpec("camera_server", [py, "Server/camera_stream_server.py", "--config", config], False)
+            )
+        return specs
     if role == "all":
-        return [
-            ("g29_receiver", [py, "Server/g29_receiver.py", "--config", config]),
-            ("camera_server", [py, "Server/camera_stream_server.py", "--config", config]),
-            ("g29_sender", [py, "Client/g29_sender.py", "--config", config]),
-            ("camera_viewer", [py, "Client/camera_stream_client.py", "--config", config]),
+        specs = [
+            ProcessSpec("g29_receiver", [py, "Server/g29_receiver.py", "--config", config], True),
+            ProcessSpec("g29_sender", [py, "Client/g29_sender.py", "--config", config], True),
         ]
+        if not no_camera:
+            specs.append(
+                ProcessSpec("camera_server", [py, "Server/camera_stream_server.py", "--config", config], False)
+            )
+            specs.append(
+                ProcessSpec("camera_viewer", [py, "Client/camera_stream_client.py", "--config", config], False)
+            )
+        return specs
     raise ValueError(f"Unsupported role: {role}")
 
 
@@ -64,10 +85,11 @@ def main() -> None:
         help="pc: sender+viewer, pi: receiver+camera server, all: everything on one machine",
     )
     parser.add_argument("--config", default=DEFAULT_CONFIG, help="Path to config json")
+    parser.add_argument("--no-camera", action="store_true", help="Skip camera processes")
     args = parser.parse_args()
 
-    commands = role_commands(args.role, args.config)
-    processes: list[tuple[str, subprocess.Popen]] = []
+    commands = role_commands(args.role, args.config, args.no_camera)
+    processes: list[tuple[ProcessSpec, subprocess.Popen]] = []
     stopping = False
 
     def handle_signal(sig, frame):  # type: ignore[no-untyped-def]
@@ -76,27 +98,35 @@ def main() -> None:
             return
         stopping = True
         print("\nReceived signal, shutting down...")
-        stop_processes(processes)
+        stop_processes([(s.name, p) for s, p in processes])
 
     signal.signal(signal.SIGINT, handle_signal)
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, handle_signal)
 
     try:
-        for name, cmd in commands:
-            processes.append((name, launch_process(cmd, name)))
+        for spec in commands:
+            processes.append((spec, launch_process(spec.command, spec.name)))
 
         print(f"Master running in '{args.role}' mode. Press Ctrl+C to stop.")
         while True:
-            for name, proc in processes:
+            for spec, proc in processes:
                 code = proc.poll()
                 if code is not None:
-                    print(f"[exit] {name} exited with code {code}")
-                    stop_processes(processes)
-                    sys.exit(code if code != 0 else 0)
+                    print(f"[exit] {spec.name} exited with code {code}")
+                    if spec.required:
+                        stop_processes([(s.name, p) for s, p in processes])
+                        sys.exit(code if code != 0 else 0)
+                    # Optional process failed: keep required control processes running.
+                    if spec.name in {"camera_viewer", "camera_server"} and code != 0:
+                        print(
+                            f"[warn] {spec.name} failed. If this is missing dependency, "
+                            "install: pip install opencv-python"
+                        )
+                    processes = [(s, p) for s, p in processes if p is not proc]
             time.sleep(0.2)
     finally:
-        stop_processes(processes)
+        stop_processes([(s.name, p) for s, p in processes])
 
 
 if __name__ == "__main__":
