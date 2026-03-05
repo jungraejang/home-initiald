@@ -42,6 +42,45 @@ python3 Server/g29_receiver.py --config g29_control/config.json
 python Client/g29_sender.py --config g29_control/config.json
 ```
 
+## 5) Real-time camera feed
+
+### Start camera stream on Raspberry Pi
+
+```bash
+python3 Server/camera_stream_server.py --config g29_control/config.json
+```
+
+### View camera feed on PC
+
+```bash
+python Client/camera_stream_client.py --config g29_control/config.json
+```
+
+Press `q` in the viewer window to close.
+
+## 6) One-command master launcher
+
+Instead of running separate scripts manually, use:
+
+```bash
+python master_control.py --role pi --config g29_control/config.json
+```
+
+on Raspberry Pi, and:
+
+```bash
+python master_control.py --role pc --config g29_control/config.json
+```
+
+on Windows PC.
+
+Modes:
+- `--role pi`: starts `Server/g29_receiver.py` + `Server/camera_stream_server.py`
+- `--role pc`: starts `Client/g29_sender.py` + `Client/camera_stream_client.py`
+- `--role all`: starts everything on one machine (debug/testing only)
+
+Press `Ctrl+C` in the master terminal to stop all child processes together.
+
 Optional calibration readout:
 
 ```bash
@@ -74,6 +113,9 @@ Use calibration output to update `input.axis_min` / `input.axis_max`.
 - `mapping.in_place_turn_pwm`: turn-in-place strength.
 - `mapping.forward_steer_boost`: adds steering authority as forward speed increases.
 - `mapping.max_steer_gain`: caps boosted steering gain to keep control stable.
+- `camera_stream.width/height`: stream resolution (lower values reduce latency).
+- `camera_stream.port`: camera stream TCP port.
+- `camera_stream.host_client`: Pi IP used by PC viewer if `--host` is not passed.
 
 ## Tuning checklist
 

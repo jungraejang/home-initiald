@@ -43,6 +43,15 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "logging": {
         "print_every_n": 20,
     },
+    "camera_stream": {
+        "host": "0.0.0.0",
+        "host_client": "192.168.4.1",
+        "port": 8001,
+        "width": 640,
+        "height": 360,
+        "hflip": False,
+        "vflip": False,
+    },
 }
 
 
