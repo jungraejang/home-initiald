@@ -207,16 +207,18 @@ HTML_PAGE = """<!doctype html>
         document.getElementById('status').textContent = 'WebXR not available in this browser';
         return;
       }
-      const supported = await navigator.xr.isSessionSupported('immersive-vr');
+      // Use inline XR for head-pose tracking only. This avoids immersive-mode
+      // loading/renderer issues in browsers when we do not render XR graphics.
+      const supported = await navigator.xr.isSessionSupported('inline');
       if (!supported) {
-        document.getElementById('status').textContent = 'Immersive VR not supported';
+        document.getElementById('status').textContent = 'Inline WebXR not supported';
         return;
       }
-      xrSession = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
-      xrRefSpace = await xrSession.requestReferenceSpace('local');
+      xrSession = await navigator.xr.requestSession('inline');
+      xrRefSpace = await xrSession.requestReferenceSpace('viewer');
       xrActive = true;
       document.getElementById('xrBtn').textContent = 'Stop XR Tracking';
-      document.getElementById('status').textContent = 'XR tracking started';
+      document.getElementById('status').textContent = 'XR tracking started (inline mode)';
       baseYaw = null;
       basePitch = null;
       xrSession.addEventListener('end', () => {
@@ -244,7 +246,7 @@ HTML_PAGE = """<!doctype html>
         if (!xrActive) await startXR();
         else await stopXR();
       } catch (e) {
-        document.getElementById('status').textContent = 'Could not start XR tracking';
+        document.getElementById('status').textContent = `Could not start XR tracking: ${e}`;
       }
     }
 
