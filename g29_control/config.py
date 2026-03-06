@@ -47,10 +47,14 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "host": "0.0.0.0",
         "host_client": "192.168.4.1",
         "port": 8001,
-        "width": 640,
-        "height": 360,
+        "width": 1280,
+        "height": 720,
         "hflip": False,
         "vflip": False,
+        "client_hflip": False,
+        "client_vflip": False,
+        "client_display_width": 1280,
+        "client_display_height": 720,
     },
 }
 

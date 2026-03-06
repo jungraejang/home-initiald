@@ -123,6 +123,9 @@ Use calibration output to update `input.axis_min` / `input.axis_max`.
 - `camera_stream.width/height`: stream resolution (lower values reduce latency).
 - `camera_stream.port`: camera stream TCP port.
 - `camera_stream.host_client`: Pi IP used by PC viewer if `--host` is not passed.
+- `camera_stream.client_hflip`: horizontal flip in PC viewer.
+- `camera_stream.client_vflip`: vertical flip in PC viewer.
+- `camera_stream.client_display_width/height`: resize output window frame on PC viewer.
 
 ## Tuning checklist
 

@@ -49,9 +49,13 @@
     "host": "0.0.0.0",
     "host_client": "192.168.0.102",
     "port": 8001,
-    "width": 640,
-    "height": 360,
+    "width": 1280,
+    "height": 720,
     "hflip": false,
-    "vflip": false
+    "vflip": false,
+    "client_hflip": true,
+    "client_vflip": true,
+    "client_display_width": 1280,
+    "client_display_height": 720
   }
 }

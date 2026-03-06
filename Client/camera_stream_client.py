@@ -38,11 +38,20 @@ def main() -> None:
 
     host = args.host or cam_cfg.get("host_client", net_cfg.get("pi_host", "127.0.0.1"))
     port = int(args.port or cam_cfg.get("port", 8001))
+    client_hflip = bool(cam_cfg.get("client_hflip", False))
+    client_vflip = bool(cam_cfg.get("client_vflip", False))
+    display_width = int(cam_cfg.get("client_display_width", 0))
+    display_height = int(cam_cfg.get("client_display_height", 0))
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     sock.connect((host, port))
     print(f"Connected to camera stream {host}:{port}")
+    print(f"Viewer flip settings: hflip={int(client_hflip)} vflip={int(client_vflip)}")
+    if display_width > 0 and display_height > 0:
+        print(f"Viewer display size: {display_width}x{display_height}")
+
+    cv2.namedWindow("Pi Camera Stream", cv2.WINDOW_NORMAL)
 
     frame_count = 0
     t0 = time.monotonic()
@@ -55,6 +64,16 @@ def main() -> None:
             image = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
             if image is None:
                 continue
+
+            if client_hflip and client_vflip:
+                image = cv2.flip(image, -1)
+            elif client_hflip:
+                image = cv2.flip(image, 1)
+            elif client_vflip:
+                image = cv2.flip(image, 0)
+
+            if display_width > 0 and display_height > 0:
+                image = cv2.resize(image, (display_width, display_height), interpolation=cv2.INTER_LINEAR)
 
             frame_count += 1
             if frame_count % 30 == 0:
