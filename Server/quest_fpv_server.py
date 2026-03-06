@@ -263,14 +263,15 @@ HTML_PAGE = """<!doctype html>
       xrSession.updateRenderState({ baseLayer: xrBaseLayer });
 
       if (mode === 'inline') {
-        // Inline XR is most reliable with viewer space on Quest browsers.
+        // For head tracking, we need world-referenced pose (local/local-floor).
+        // Viewer space can become self-relative identity and yield yaw/pitch ~= 0.
         try {
-          xrRefSpace = await xrSession.requestReferenceSpace('viewer');
+          xrRefSpace = await xrSession.requestReferenceSpace('local');
         } catch (_e0) {
           try {
-            xrRefSpace = await xrSession.requestReferenceSpace('local');
-          } catch (_e1) {
             xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+          } catch (_e1) {
+            xrRefSpace = await xrSession.requestReferenceSpace('viewer');
           }
         }
       } else {
