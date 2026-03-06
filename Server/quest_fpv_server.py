@@ -98,6 +98,8 @@ HTML_PAGE = """<!doctype html>
     let xrNullPoseCount = 0;
     let xrLastError = '';
     let baseYaw = null, basePitch = null;
+    let lastQ = {x: 0, y: 0, z: 0, w: 1};
+    const headDeadbandDeg = 0.8;
 
     const stepRange = document.getElementById('stepRange');
     const stepVal = document.getElementById('stepVal');
@@ -215,6 +217,7 @@ HTML_PAGE = """<!doctype html>
       if (pose && pose.views && pose.views.length > 0) {
         xrPoseCount += 1;
         const q = pose.views[0].transform.orientation;
+        lastQ = {x: q.x, y: q.y, z: q.z, w: q.w};
         const yp = quaternionToYawPitch(q.x, q.y, q.z, q.w);
         if (baseYaw == null || basePitch == null) {
           baseYaw = yp.yawDeg;
@@ -228,6 +231,11 @@ HTML_PAGE = """<!doctype html>
           const dpitch = normalizeDeg(yp.pitchDeg - basePitch);
           const yawSens = parseFloat(yawRange.value);
           const pitchSens = parseFloat(pitchRange.value);
+          // Prevent constant neutral head packets from overriding manual controls.
+          if (Math.abs(dyaw) < headDeadbandDeg && Math.abs(dpitch) < headDeadbandDeg) {
+            if (xrSession) xrSession.requestAnimationFrame(xrFrame);
+            return;
+          }
           send({
             mode: 'head',
             yaw: dyaw * yawSens,
@@ -351,6 +359,7 @@ xrFrames: ${xrFrameCount}
 xrPoses: ${xrPoseCount}
 xrNullPoses: ${xrNullPoseCount}
 xrLastError: ${xrLastError || '-'}
+q(x,y,z,w): ${lastQ.x.toFixed(3)}, ${lastQ.y.toFixed(3)}, ${lastQ.z.toFixed(3)}, ${lastQ.w.toFixed(3)}
 gyroEvents: ${orientationEventCount}
 headPacketsSent: ${headPacketsSent}
 manualPacketsSent: ${manualPacketsSent}
