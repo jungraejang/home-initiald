@@ -91,6 +91,8 @@ HTML_PAGE = """<!doctype html>
     let xrMode = '';
     let xrPreferImmersive = false;
     let xrFrameCount = 0;
+    let xrPoseCount = 0;
+    let xrNullPoseCount = 0;
     let xrLastError = '';
     let baseYaw = null, basePitch = null;
 
@@ -193,6 +195,7 @@ HTML_PAGE = """<!doctype html>
       xrFrameCount += 1;
       const pose = frame.getViewerPose(xrRefSpace);
       if (pose && pose.views && pose.views.length > 0) {
+        xrPoseCount += 1;
         const mat = pose.views[0].transform.matrix;
         const yp = matrixToYawPitch(mat);
         if (baseYaw == null || basePitch == null) {
@@ -215,6 +218,8 @@ HTML_PAGE = """<!doctype html>
           document.getElementById('status').textContent =
             `XR(${xrMode}) yaw=${yp.yawDeg.toFixed(1)}, pitch=${yp.pitchDeg.toFixed(1)}`;
         }
+      } else {
+        xrNullPoseCount += 1;
       }
       if (xrSession) xrSession.requestAnimationFrame(xrFrame);
     }
@@ -246,18 +251,33 @@ HTML_PAGE = """<!doctype html>
         xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(xrSession, gl) });
       }
 
-      try {
-        xrRefSpace = await xrSession.requestReferenceSpace('local');
-      } catch (_e1) {
+      if (mode === 'inline') {
+        // Inline XR is most reliable with viewer space on Quest browsers.
         try {
-          xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
-        } catch (_e2) {
           xrRefSpace = await xrSession.requestReferenceSpace('viewer');
+        } catch (_e0) {
+          try {
+            xrRefSpace = await xrSession.requestReferenceSpace('local');
+          } catch (_e1) {
+            xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+          }
+        }
+      } else {
+        try {
+          xrRefSpace = await xrSession.requestReferenceSpace('local');
+        } catch (_e1) {
+          try {
+            xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+          } catch (_e2) {
+            xrRefSpace = await xrSession.requestReferenceSpace('viewer');
+          }
         }
       }
 
       xrActive = true;
       xrFrameCount = 0;
+      xrPoseCount = 0;
+      xrNullPoseCount = 0;
       xrLastError = '';
       document.getElementById('xrBtn').textContent = 'Stop XR Tracking';
       document.getElementById('status').textContent = `XR tracking started (${mode})`;
@@ -306,6 +326,8 @@ deviceOrientationApi: ${gyroApi}
 xrActive: ${xrActive}
 xrMode: ${xrMode || '-'}
 xrFrames: ${xrFrameCount}
+xrPoses: ${xrPoseCount}
+xrNullPoses: ${xrNullPoseCount}
 xrLastError: ${xrLastError || '-'}
 gyroEvents: ${orientationEventCount}
 headPacketsSent: ${headPacketsSent}
