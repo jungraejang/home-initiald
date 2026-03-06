@@ -84,6 +84,7 @@ HTML_PAGE = """<!doctype html>
     let lastSendTs = 0;
     let orientationEventCount = 0;
     let headPacketsSent = 0;
+    let manualPacketsSent = 0;
     const minIntervalMs = 50; // 20Hz
     let xrSession = null;
     let xrRefSpace = null;
@@ -118,11 +119,16 @@ HTML_PAGE = """<!doctype html>
         });
         if (payload.mode === 'head') {
           headPacketsSent += 1;
+        } else {
+          manualPacketsSent += 1;
         }
-        try {
-          const data = await resp.json();
-          window._lastServoState = data;
-        } catch (_e) {}
+        let data = null;
+        try { data = await resp.json(); } catch (_e) {}
+        if (data) window._lastServoState = data;
+        if (!resp.ok) {
+          const err = (data && data.error) ? data.error : `HTTP ${resp.status}`;
+          document.getElementById('status').textContent = `Servo command error: ${err}`;
+        }
       } catch (e) {}
     }
 
@@ -181,14 +187,14 @@ HTML_PAGE = """<!doctype html>
     function radToDeg(v) { return v * 180.0 / Math.PI; }
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-    function matrixToYawPitch(mat) {
-      // WebXR matrices are column-major. Z axis is indices 8,9,10.
-      // Camera forward is -Z axis.
-      const fx = -mat[8];
-      const fy = -mat[9];
-      const fz = -mat[10];
-      const yaw = Math.atan2(fx, -fz);
-      const pitch = Math.atan2(fy, Math.sqrt(fx * fx + fz * fz));
+    function quaternionToYawPitch(qx, qy, qz, qw) {
+      // Y-up convention: yaw around Y, pitch around X.
+      const sinYaw = 2.0 * (qw * qy + qx * qz);
+      const cosYaw = 1.0 - 2.0 * (qy * qy + qx * qx);
+      const yaw = Math.atan2(sinYaw, cosYaw);
+
+      const sinPitch = 2.0 * (qw * qx - qy * qz);
+      const pitch = Math.asin(clamp(sinPitch, -1.0, 1.0));
       return { yawDeg: radToDeg(yaw), pitchDeg: radToDeg(pitch) };
     }
 
@@ -208,8 +214,8 @@ HTML_PAGE = """<!doctype html>
       const pose = frame.getViewerPose(xrRefSpace);
       if (pose && pose.views && pose.views.length > 0) {
         xrPoseCount += 1;
-        const mat = pose.views[0].transform.matrix;
-        const yp = matrixToYawPitch(mat);
+        const q = pose.views[0].transform.orientation;
+        const yp = quaternionToYawPitch(q.x, q.y, q.z, q.w);
         if (baseYaw == null || basePitch == null) {
           baseYaw = yp.yawDeg;
           basePitch = yp.pitchDeg;
@@ -347,6 +353,7 @@ xrNullPoses: ${xrNullPoseCount}
 xrLastError: ${xrLastError || '-'}
 gyroEvents: ${orientationEventCount}
 headPacketsSent: ${headPacketsSent}
+manualPacketsSent: ${manualPacketsSent}
 servoPanTilt: ${st.pan ?? '-'}, ${st.tilt ?? '-'}
 servoOk: ${st.servo_ok ?? '-'}`;
       document.getElementById('diag').textContent = txt;
