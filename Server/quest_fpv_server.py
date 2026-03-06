@@ -89,6 +89,7 @@ HTML_PAGE = """<!doctype html>
     let xrRefSpace = null;
     let xrActive = false;
     let xrMode = '';
+    let xrPreferImmersive = false;
     let xrFrameCount = 0;
     let xrLastError = '';
     let baseYaw = null, basePitch = null;
@@ -176,13 +177,14 @@ HTML_PAGE = """<!doctype html>
     function radToDeg(v) { return v * 180.0 / Math.PI; }
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-    function quaternionToYawPitch(qx, qy, qz, qw) {
-      const siny_cosp = 2.0 * (qw * qz + qx * qy);
-      const cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz);
-      const yaw = Math.atan2(siny_cosp, cosy_cosp);
-
-      const sinp = 2.0 * (qw * qy - qz * qx);
-      const pitch = Math.asin(clamp(sinp, -1.0, 1.0));
+    function matrixToYawPitch(mat) {
+      // WebXR matrices are column-major. Z axis is indices 8,9,10.
+      // Camera forward is -Z axis.
+      const fx = -mat[8];
+      const fy = -mat[9];
+      const fz = -mat[10];
+      const yaw = Math.atan2(fx, -fz);
+      const pitch = Math.atan2(fy, Math.sqrt(fx * fx + fz * fz));
       return { yawDeg: radToDeg(yaw), pitchDeg: radToDeg(pitch) };
     }
 
@@ -191,8 +193,8 @@ HTML_PAGE = """<!doctype html>
       xrFrameCount += 1;
       const pose = frame.getViewerPose(xrRefSpace);
       if (pose && pose.views && pose.views.length > 0) {
-        const q = pose.views[0].transform.orientation;
-        const yp = quaternionToYawPitch(q.x, q.y, q.z, q.w);
+        const mat = pose.views[0].transform.matrix;
+        const yp = matrixToYawPitch(mat);
         if (baseYaw == null || basePitch == null) {
           baseYaw = yp.yawDeg;
           basePitch = yp.pitchDeg;
@@ -222,10 +224,10 @@ HTML_PAGE = """<!doctype html>
         document.getElementById('status').textContent = 'WebXR not available in this browser';
         return;
       }
-      let mode = 'immersive-vr';
+      let mode = xrPreferImmersive ? 'immersive-vr' : 'inline';
       let supported = await navigator.xr.isSessionSupported(mode);
       if (!supported) {
-        mode = 'inline';
+        mode = mode === 'inline' ? 'immersive-vr' : 'inline';
         supported = await navigator.xr.isSessionSupported(mode);
       }
       if (!supported) {
@@ -352,6 +354,7 @@ servoOk: ${st.servo_ok ?? '-'}`;
         const r = await fetch('/api/state');
         const s = await r.json();
         window._lastServoState = s;
+        xrPreferImmersive = !!s.xr_prefer_immersive;
         if (s.video_rotate_180) {
           document.getElementById('video').style.transform = 'rotate(180deg)';
         }
@@ -381,6 +384,7 @@ class QuestFPVState:
         self.pitch_to_deg = float(qcfg.get("pitch_to_deg", 0.5))
         self.invert_tilt = bool(qcfg.get("invert_tilt", False))
         self.video_rotate_180 = bool(qcfg.get("video_rotate_180", False))
+        self.xr_prefer_immersive = bool(qcfg.get("xr_prefer_immersive", False))
         self.pan = self.home_pan
         self.tilt = self.home_tilt
         self._lock = threading.Lock()
@@ -453,6 +457,7 @@ class QuestFPVState:
                 "servo_ok": self.servo is not None,
                 "servo_error": self.servo_error,
                 "video_rotate_180": self.video_rotate_180,
+                "xr_prefer_immersive": self.xr_prefer_immersive,
             }
 
     def close(self) -> None:

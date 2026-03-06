@@ -173,6 +173,7 @@ Config keys:
 - `quest_fpv.yaw_to_deg`, `quest_fpv.pitch_to_deg`
 - `quest_fpv.invert_tilt`
 - `quest_fpv.video_rotate_180` (Quest page-only 180-degree video rotation)
+- `quest_fpv.xr_prefer_immersive` (default `false`; keep false to avoid black immersive view)
 
 ### Native HTTPS setup for Quest sensors
 
