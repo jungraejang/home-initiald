@@ -56,6 +56,19 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "client_display_width": 1280,
         "client_display_height": 960,
     },
+    "servo_control": {
+        "pi_host": "192.168.4.1",
+        "pi_port": 5006,
+        "listen_host": "0.0.0.0",
+        "listen_port": 5006,
+        "pan_channel": "0",
+        "tilt_channel": "1",
+        "step": 5,
+        "min_angle": 0,
+        "max_angle": 180,
+        "home_pan": 90,
+        "home_tilt": 90,
+    },
 }
 
 

@@ -75,8 +75,8 @@ python master_control.py --role pc --config g29_control/config.json
 on Windows PC.
 
 Modes:
-- `--role pi`: starts `Server/g29_receiver.py` + `Server/camera_stream_server.py`
-- `--role pc`: starts `Client/g29_sender.py` + `Client/camera_stream_client.py`
+- `--role pi`: starts `Server/g29_receiver.py` + `Server/camera_stream_server.py` + `Server/servo_control_server.py`
+- `--role pc`: starts `Client/g29_sender.py` + `Client/camera_stream_client.py` + `Client/camera_servo_ui.py`
 - `--role all`: starts everything on one machine (debug/testing only)
 - `--no-camera`: run control only (skip camera processes)
 
@@ -126,6 +126,19 @@ Use calibration output to update `input.axis_min` / `input.axis_max`.
 - `camera_stream.client_hflip`: horizontal flip in PC viewer.
 - `camera_stream.client_vflip`: vertical flip in PC viewer.
 - `camera_stream.client_display_width/height`: resize output window frame on PC viewer.
+- `servo_control.pi_host/pi_port`: PC UI target for camera servo command UDP.
+- `servo_control.listen_host/listen_port`: Pi servo server bind address and port.
+- `servo_control.pan_channel/tilt_channel`: servo channels used for camera mount.
+- `servo_control.step`: angle step per arrow button press.
+- `servo_control.home_pan/home_tilt`: home angle when pressing Home button (or `H` key).
+
+## Camera servo arrow UI
+
+When running PC master mode, `Client/camera_servo_ui.py` opens a small arrow-button window:
+- Up/Down: tilt servo
+- Left/Right: pan servo
+- Home button (or keyboard `H`): return to configured home angles
+- Arrow keys also work when the window is focused
 
 ## Tuning checklist
 

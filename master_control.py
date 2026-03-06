@@ -48,6 +48,9 @@ def role_commands(role: str, config: str, no_camera: bool) -> list[ProcessSpec]:
             specs.append(
                 ProcessSpec("camera_viewer", [py, "Client/camera_stream_client.py", "--config", config], False)
             )
+            specs.append(
+                ProcessSpec("camera_servo_ui", [py, "Client/camera_servo_ui.py", "--config", config], False)
+            )
         return specs
     if role == "pi":
         specs = [
@@ -56,6 +59,9 @@ def role_commands(role: str, config: str, no_camera: bool) -> list[ProcessSpec]:
         if not no_camera:
             specs.append(
                 ProcessSpec("camera_server", [py, "Server/camera_stream_server.py", "--config", config], False)
+            )
+            specs.append(
+                ProcessSpec("servo_server", [py, "Server/servo_control_server.py", "--config", config], False)
             )
         return specs
     if role == "all":
@@ -68,7 +74,13 @@ def role_commands(role: str, config: str, no_camera: bool) -> list[ProcessSpec]:
                 ProcessSpec("camera_server", [py, "Server/camera_stream_server.py", "--config", config], False)
             )
             specs.append(
+                ProcessSpec("servo_server", [py, "Server/servo_control_server.py", "--config", config], False)
+            )
+            specs.append(
                 ProcessSpec("camera_viewer", [py, "Client/camera_stream_client.py", "--config", config], False)
+            )
+            specs.append(
+                ProcessSpec("camera_servo_ui", [py, "Client/camera_servo_ui.py", "--config", config], False)
             )
         return specs
     raise ValueError(f"Unsupported role: {role}")
@@ -118,11 +130,16 @@ def main() -> None:
                         stop_processes([(s.name, p) for s, p in processes])
                         sys.exit(code if code != 0 else 0)
                     # Optional process failed: keep required control processes running.
-                    if spec.name in {"camera_viewer", "camera_server"} and code != 0:
+                    if spec.name in {"camera_viewer", "camera_server", "servo_server"} and code != 0:
                         if spec.name == "camera_viewer":
                             print(
                                 "[warn] camera_viewer failed. If cv2 is missing, run: "
                                 "python -m pip install opencv-python"
+                            )
+                        elif spec.name == "servo_server":
+                            print(
+                                "[warn] servo_server failed. Check I2C/PCA9685 with: "
+                                "sudo i2cdetect -y 1"
                             )
                         else:
                             print(
