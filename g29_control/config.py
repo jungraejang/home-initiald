@@ -73,6 +73,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "quest_fpv": {
         "host": "0.0.0.0",
         "port": 8080,
+        "https_enabled": False,
+        "https_port": 8443,
+        "tls_cert_path": "certs/quest_fpv.crt",
+        "tls_key_path": "certs/quest_fpv.key",
+        "http_redirect_to_https": True,
         "pan_channel": "0",
         "tilt_channel": "1",
         "min_angle": 0,

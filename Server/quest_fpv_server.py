@@ -1,5 +1,6 @@
 import argparse
 import json
+import ssl
 import sys
 import threading
 from http import HTTPStatus
@@ -391,6 +392,30 @@ class QuestHandler(BaseHTTPRequestHandler):
         return
 
 
+class RedirectHandler(BaseHTTPRequestHandler):
+    https_port: int = 8443
+
+    def _redirect(self) -> None:
+        host = self.headers.get("Host", "")
+        host_only = host.split(":", 1)[0] if host else "localhost"
+        target = f"https://{host_only}:{self.https_port}{self.path}"
+        self.send_response(HTTPStatus.MOVED_PERMANENTLY)
+        self.send_header("Location", target)
+        self.end_headers()
+
+    def do_GET(self) -> None:  # noqa: N802
+        self._redirect()
+
+    def do_POST(self) -> None:  # noqa: N802
+        self._redirect()
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        self._redirect()
+
+    def log_message(self, fmt: str, *args) -> None:  # noqa: A003
+        return
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Quest FPV web server (video + head/manual pan/tilt)")
     parser.add_argument("--config", default=str(ROOT / "g29_control" / "config.json"))
@@ -400,19 +425,50 @@ def main() -> None:
     qcfg = cfg.get("quest_fpv", {})
     host = qcfg.get("host", "0.0.0.0")
     port = int(qcfg.get("port", 8080))
+    https_enabled = bool(qcfg.get("https_enabled", False))
+    https_port = int(qcfg.get("https_port", 8443))
+    tls_cert = qcfg.get("tls_cert_path", "")
+    tls_key = qcfg.get("tls_key_path", "")
+    redirect_http = bool(qcfg.get("http_redirect_to_https", True))
 
     state = QuestFPVState(cfg)
     QuestHandler.state = state
-    server = ThreadingHTTPServer((host, port), QuestHandler)
-    print(f"[quest_fpv] Open http://{host}:{port} from Quest browser")
+    server = None
+    redirect_server = None
+    if https_enabled:
+        cert_path = str((ROOT / tls_cert).resolve()) if tls_cert else ""
+        key_path = str((ROOT / tls_key).resolve()) if tls_key else ""
+        if not cert_path or not key_path or not Path(cert_path).exists() or not Path(key_path).exists():
+            raise FileNotFoundError(
+                "HTTPS enabled but certificate/key file not found. "
+                "Set quest_fpv.tls_cert_path and quest_fpv.tls_key_path in config."
+            )
+        server = ThreadingHTTPServer((host, https_port), QuestHandler)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(certfile=cert_path, keyfile=key_path)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
+        print(f"[quest_fpv] HTTPS server on https://{host}:{https_port}")
+        if redirect_http:
+            RedirectHandler.https_port = https_port
+            redirect_server = ThreadingHTTPServer((host, port), RedirectHandler)
+            threading.Thread(target=redirect_server.serve_forever, daemon=True).start()
+            print(f"[quest_fpv] HTTP redirect on http://{host}:{port} -> HTTPS")
+    else:
+        server = ThreadingHTTPServer((host, port), QuestHandler)
+        print(f"[quest_fpv] Open http://{host}:{port} from Quest browser")
+
     print("[quest_fpv] If host is 0.0.0.0, use Pi LAN IP in Quest URL")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nStopping quest FPV server.")
     finally:
-        server.shutdown()
-        server.server_close()
+        if redirect_server is not None:
+            redirect_server.shutdown()
+            redirect_server.server_close()
+        if server is not None:
+            server.shutdown()
+            server.server_close()
         state.close()
 
 

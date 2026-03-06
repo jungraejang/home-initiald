@@ -164,11 +164,38 @@ http://<PI_IP>:8080
 
 Config keys:
 - `quest_fpv.host`, `quest_fpv.port`
+- `quest_fpv.https_enabled`, `quest_fpv.https_port`
+- `quest_fpv.tls_cert_path`, `quest_fpv.tls_key_path`
+- `quest_fpv.http_redirect_to_https`
 - `quest_fpv.pan_channel`, `quest_fpv.tilt_channel`
 - `quest_fpv.home_pan`, `quest_fpv.home_tilt`
 - `quest_fpv.yaw_to_deg`, `quest_fpv.pitch_to_deg`
 - `quest_fpv.invert_tilt`
 - `quest_fpv.video_rotate_180` (Quest page-only 180-degree video rotation)
+
+### Native HTTPS setup for Quest sensors
+
+On Pi, generate a self-signed cert:
+
+```bash
+chmod +x scripts/generate_quest_tls.sh
+./scripts/generate_quest_tls.sh
+```
+
+Then set in `g29_control/config.json`:
+
+```json
+"https_enabled": true,
+"https_port": 8443
+```
+
+Run Quest FPV server, then open:
+
+```text
+https://<PI_IP>:8443
+```
+
+If enabled, HTTP port can auto-redirect to HTTPS using `http_redirect_to_https`.
 
 ## Tuning checklist
 
