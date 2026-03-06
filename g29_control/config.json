@@ -90,6 +90,6 @@
     "pitch_to_deg": 0.5,
     "invert_tilt": true,
     "video_rotate_180": true,
-    "xr_prefer_immersive": false
+    "xr_prefer_immersive": true
   }
 }

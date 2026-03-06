@@ -90,6 +90,11 @@ HTML_PAGE = """<!doctype html>
     let xrRefSpace = null;
     let xrGl = null;
     let xrBaseLayer = null;
+    let xrProgram = null;
+    let xrPosBuffer = null;
+    let xrUvBuffer = null;
+    let xrTexture = null;
+    let xrVideoEl = null;
     let xrActive = false;
     let xrMode = '';
     let xrPreferImmersive = false;
@@ -211,6 +216,9 @@ HTML_PAGE = """<!doctype html>
         xrGl.viewport(0, 0, xrBaseLayer.framebufferWidth, xrBaseLayer.framebufferHeight);
         xrGl.clearColor(0, 0, 0, 1);
         xrGl.clear(xrGl.COLOR_BUFFER_BIT);
+        if (xrMode === 'immersive-vr') {
+          renderVideoToXr();
+        }
       }
 
       const pose = frame.getViewerPose(xrRefSpace);
@@ -275,6 +283,9 @@ HTML_PAGE = """<!doctype html>
       await xrGl.makeXRCompatible();
       xrBaseLayer = new XRWebGLLayer(xrSession, xrGl);
       xrSession.updateRenderState({ baseLayer: xrBaseLayer });
+      if (xrMode === 'immersive-vr') {
+        initXrVideoRenderer();
+      }
 
       if (mode === 'inline') {
         // For head tracking, we need world-referenced pose (local/local-floor).
@@ -409,12 +420,96 @@ servoOk: ${st.servo_ok ?? '-'}`;
         const s = await r.json();
         window._lastServoState = s;
         xrPreferImmersive = !!s.xr_prefer_immersive;
+        xrVideoEl = document.getElementById('video');
         if (s.video_rotate_180) {
           document.getElementById('video').style.transform = 'rotate(180deg)';
         }
       } catch (_e) {}
       updateDiag();
       setInterval(updateDiag, 1000);
+    }
+
+    function compileShader(gl, type, src) {
+      const sh = gl.createShader(type);
+      gl.shaderSource(sh, src);
+      gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+        throw new Error(gl.getShaderInfoLog(sh) || 'shader compile failed');
+      }
+      return sh;
+    }
+
+    function initXrVideoRenderer() {
+      const gl = xrGl;
+      if (!gl) return;
+      const vs = `
+        attribute vec2 aPos;
+        attribute vec2 aUv;
+        varying vec2 vUv;
+        void main() {
+          vUv = aUv;
+          gl_Position = vec4(aPos, 0.0, 1.0);
+        }`;
+      const fs = `
+        precision mediump float;
+        varying vec2 vUv;
+        uniform sampler2D uTex;
+        void main() {
+          gl_FragColor = texture2D(uTex, vUv);
+        }`;
+      const vsh = compileShader(gl, gl.VERTEX_SHADER, vs);
+      const fsh = compileShader(gl, gl.FRAGMENT_SHADER, fs);
+      xrProgram = gl.createProgram();
+      gl.attachShader(xrProgram, vsh);
+      gl.attachShader(xrProgram, fsh);
+      gl.linkProgram(xrProgram);
+      if (!gl.getProgramParameter(xrProgram, gl.LINK_STATUS)) {
+        throw new Error(gl.getProgramInfoLog(xrProgram) || 'program link failed');
+      }
+      xrPosBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, xrPosBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1,  1, -1,  -1, 1,
+        -1,  1,  1, -1,   1, 1
+      ]), gl.STATIC_DRAW);
+      xrUvBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, xrUvBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+         0, 1,  1, 1,  0, 0,
+         0, 0,  1, 1,  1, 0
+      ]), gl.STATIC_DRAW);
+      xrTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, xrTexture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+        new Uint8Array([0,0,0,255, 0,0,0,255, 0,0,0,255, 0,0,0,255]));
+    }
+
+    function renderVideoToXr() {
+      const gl = xrGl;
+      if (!gl || !xrProgram || !xrTexture || !xrVideoEl) return;
+      gl.useProgram(xrProgram);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, xrTexture);
+      try {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, xrVideoEl);
+      } catch (_e) {}
+
+      const posLoc = gl.getAttribLocation(xrProgram, 'aPos');
+      const uvLoc = gl.getAttribLocation(xrProgram, 'aUv');
+      const texLoc = gl.getUniformLocation(xrProgram, 'uTex');
+      gl.uniform1i(texLoc, 0);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, xrPosBuffer);
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, xrUvBuffer);
+      gl.enableVertexAttribArray(uvLoc);
+      gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
     initPage();
   </script>
