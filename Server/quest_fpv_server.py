@@ -215,7 +215,15 @@ HTML_PAGE = """<!doctype html>
         return;
       }
       xrSession = await navigator.xr.requestSession('inline');
-      xrRefSpace = await xrSession.requestReferenceSpace('viewer');
+      try {
+        xrRefSpace = await xrSession.requestReferenceSpace('local');
+      } catch (_e1) {
+        try {
+          xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
+        } catch (_e2) {
+          xrRefSpace = await xrSession.requestReferenceSpace('viewer');
+        }
+      }
       xrActive = true;
       document.getElementById('xrBtn').textContent = 'Stop XR Tracking';
       document.getElementById('status').textContent = 'XR tracking started (inline mode)';
