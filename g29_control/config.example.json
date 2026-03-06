@@ -50,12 +50,12 @@
     "host_client": "192.168.4.1",
     "port": 8001,
     "width": 1280,
-    "height": 720,
+    "height": 960,
     "hflip": false,
     "vflip": false,
     "client_hflip": false,
     "client_vflip": false,
     "client_display_width": 1280,
-    "client_display_height": 720
+    "client_display_height": 960
   }
 }
