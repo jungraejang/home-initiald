@@ -66,6 +66,7 @@
     "pan_channel": "0",
     "tilt_channel": "1",
     "step": 5,
+    "invert_tilt": false,
     "min_angle": 0,
     "max_angle": 180,
     "home_pan": 90,

@@ -130,6 +130,7 @@ Use calibration output to update `input.axis_min` / `input.axis_max`.
 - `servo_control.listen_host/listen_port`: Pi servo server bind address and port.
 - `servo_control.pan_channel/tilt_channel`: servo channels used for camera mount.
 - `servo_control.step`: angle step per arrow button press.
+- `servo_control.invert_tilt`: reverse up/down direction in PC arrow UI.
 - `servo_control.home_pan/home_tilt`: home angle when pressing Home button (or `H` key).
 
 ## Camera servo arrow UI

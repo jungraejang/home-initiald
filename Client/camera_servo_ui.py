@@ -17,11 +17,22 @@ def clamp(value: int, lo: int, hi: int) -> int:
 
 
 class ServoControlUI:
-    def __init__(self, host: str, port: int, step: int, min_angle: int, max_angle: int, home_pan: int, home_tilt: int):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        step: int,
+        min_angle: int,
+        max_angle: int,
+        home_pan: int,
+        home_tilt: int,
+        invert_tilt: bool,
+    ):
         self.target = (host, port)
         self.step = step
         self.min_angle = min_angle
         self.max_angle = max_angle
+        self.invert_tilt = invert_tilt
         self.home_pan = clamp(home_pan, min_angle, max_angle)
         self.home_tilt = clamp(home_tilt, min_angle, max_angle)
         self.pan = clamp(home_pan, min_angle, max_angle)
@@ -69,6 +80,8 @@ class ServoControlUI:
         self._update_status()
 
     def move(self, pan_delta: int, tilt_delta: int) -> None:
+        if self.invert_tilt:
+            tilt_delta = -tilt_delta
         self.pan = clamp(self.pan + pan_delta, self.min_angle, self.max_angle)
         self.tilt = clamp(self.tilt + tilt_delta, self.min_angle, self.max_angle)
         self.send()
@@ -100,6 +113,7 @@ def main() -> None:
     max_angle = int(scfg.get("max_angle", 180))
     home_pan = int(scfg.get("home_pan", 90))
     home_tilt = int(scfg.get("home_tilt", 90))
+    invert_tilt = bool(scfg.get("invert_tilt", False))
 
     ui = ServoControlUI(
         host=host,
@@ -109,8 +123,9 @@ def main() -> None:
         max_angle=max_angle,
         home_pan=home_pan,
         home_tilt=home_tilt,
+        invert_tilt=invert_tilt,
     )
-    print(f"Servo UI sending to {host}:{port}")
+    print(f"Servo UI sending to {host}:{port} (invert_tilt={int(invert_tilt)})")
     ui.run()
 
 

@@ -64,6 +64,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "pan_channel": "0",
         "tilt_channel": "1",
         "step": 5,
+        "invert_tilt": False,
         "min_angle": 0,
         "max_angle": 180,
         "home_pan": 90,
