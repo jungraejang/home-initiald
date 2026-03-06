@@ -40,6 +40,7 @@ HTML_PAGE = """<!doctype html>
 <body>
   <div id="wrap">
     <img id="video" src="/stream.mjpg" />
+    <canvas id="xrCanvas" style="display:none;"></canvas>
     <div id="controls">
       <div class="panel">
         <div class="row"><strong>Manual Pan/Tilt</strong></div>
@@ -87,6 +88,9 @@ HTML_PAGE = """<!doctype html>
     let xrSession = null;
     let xrRefSpace = null;
     let xrActive = false;
+    let xrMode = '';
+    let xrFrameCount = 0;
+    let xrLastError = '';
     let baseYaw = null, basePitch = null;
 
     const stepRange = document.getElementById('stepRange');
@@ -184,6 +188,7 @@ HTML_PAGE = """<!doctype html>
 
     function xrFrame(time, frame) {
       if (!xrSession || !xrRefSpace) return;
+      xrFrameCount += 1;
       const pose = frame.getViewerPose(xrRefSpace);
       if (pose && pose.views && pose.views.length > 0) {
         const q = pose.views[0].transform.orientation;
@@ -206,7 +211,7 @@ HTML_PAGE = """<!doctype html>
             pitch: dpitch * pitchSens
           });
           document.getElementById('status').textContent =
-            `XR tracking enabled (yaw=${yp.yawDeg.toFixed(1)}, pitch=${yp.pitchDeg.toFixed(1)})`;
+            `XR(${xrMode}) yaw=${yp.yawDeg.toFixed(1)}, pitch=${yp.pitchDeg.toFixed(1)}`;
         }
       }
       if (xrSession) xrSession.requestAnimationFrame(xrFrame);
@@ -217,14 +222,28 @@ HTML_PAGE = """<!doctype html>
         document.getElementById('status').textContent = 'WebXR not available in this browser';
         return;
       }
-      // Use inline XR for head-pose tracking only. This avoids immersive-mode
-      // loading/renderer issues in browsers when we do not render XR graphics.
-      const supported = await navigator.xr.isSessionSupported('inline');
+      let mode = 'immersive-vr';
+      let supported = await navigator.xr.isSessionSupported(mode);
       if (!supported) {
-        document.getElementById('status').textContent = 'Inline WebXR not supported';
+        mode = 'inline';
+        supported = await navigator.xr.isSessionSupported(mode);
+      }
+      if (!supported) {
+        document.getElementById('status').textContent = 'No supported WebXR mode';
         return;
       }
-      xrSession = await navigator.xr.requestSession('inline');
+
+      xrSession = await navigator.xr.requestSession(mode);
+      xrMode = mode;
+
+      if (mode === 'immersive-vr') {
+        const canvas = document.getElementById('xrCanvas');
+        const gl = canvas.getContext('webgl', { xrCompatible: true, antialias: false });
+        if (!gl) throw new Error('WebGL unavailable for immersive XR');
+        await gl.makeXRCompatible();
+        xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(xrSession, gl) });
+      }
+
       try {
         xrRefSpace = await xrSession.requestReferenceSpace('local');
       } catch (_e1) {
@@ -234,15 +253,19 @@ HTML_PAGE = """<!doctype html>
           xrRefSpace = await xrSession.requestReferenceSpace('viewer');
         }
       }
+
       xrActive = true;
+      xrFrameCount = 0;
+      xrLastError = '';
       document.getElementById('xrBtn').textContent = 'Stop XR Tracking';
-      document.getElementById('status').textContent = 'XR tracking started (inline mode)';
+      document.getElementById('status').textContent = `XR tracking started (${mode})`;
       baseYaw = null;
       basePitch = null;
       xrSession.addEventListener('end', () => {
         xrSession = null;
         xrRefSpace = null;
         xrActive = false;
+        xrMode = '';
         document.getElementById('xrBtn').textContent = 'Start XR Tracking';
         document.getElementById('status').textContent = 'XR tracking stopped';
       });
@@ -264,6 +287,7 @@ HTML_PAGE = """<!doctype html>
         if (!xrActive) await startXR();
         else await stopXR();
       } catch (e) {
+        xrLastError = String(e);
         document.getElementById('status').textContent = `Could not start XR tracking: ${e}`;
       }
     }
@@ -277,6 +301,10 @@ HTML_PAGE = """<!doctype html>
 `secureContext: ${secure}
 navigator.xr: ${hasXR}
 deviceOrientationApi: ${gyroApi}
+xrActive: ${xrActive}
+xrMode: ${xrMode || '-'}
+xrFrames: ${xrFrameCount}
+xrLastError: ${xrLastError || '-'}
 gyroEvents: ${orientationEventCount}
 headPacketsSent: ${headPacketsSent}
 servoPanTilt: ${st.pan ?? '-'}, ${st.tilt ?? '-'}
