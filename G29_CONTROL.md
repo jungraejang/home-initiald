@@ -171,6 +171,7 @@ Config keys:
 - `quest_fpv.pan_channel`, `quest_fpv.tilt_channel`
 - `quest_fpv.home_pan`, `quest_fpv.home_tilt`
 - `quest_fpv.yaw_to_deg`, `quest_fpv.pitch_to_deg`
+- `quest_fpv.invert_yaw` (reverse left/right head tracking direction)
 - `quest_fpv.invert_tilt`
 - `quest_fpv.video_rotate_180` (Quest page-only 180-degree video rotation)
 - `quest_fpv.xr_prefer_immersive` (`true` uses immersive XR; FPV video is rendered into XR layer)

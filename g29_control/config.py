@@ -86,6 +86,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "home_tilt": 90,
         "yaw_to_deg": 0.5,
         "pitch_to_deg": 0.5,
+        "invert_yaw": False,
         "invert_tilt": False,
         "video_rotate_180": False,
         "xr_prefer_immersive": False,

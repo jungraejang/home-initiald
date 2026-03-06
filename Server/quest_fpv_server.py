@@ -580,6 +580,7 @@ class QuestFPVState:
         self.home_tilt = clamp(int(qcfg.get("home_tilt", 90)), self.min_angle, self.max_angle)
         self.yaw_to_deg = float(qcfg.get("yaw_to_deg", 0.5))
         self.pitch_to_deg = float(qcfg.get("pitch_to_deg", 0.5))
+        self.invert_yaw = bool(qcfg.get("invert_yaw", False))
         self.invert_tilt = bool(qcfg.get("invert_tilt", False))
         self.video_rotate_180 = bool(qcfg.get("video_rotate_180", False))
         self.xr_prefer_immersive = bool(qcfg.get("xr_prefer_immersive", False))
@@ -636,7 +637,8 @@ class QuestFPVState:
 
     def apply_head(self, yaw: float, pitch: float) -> None:
         with self._lock:
-            pan = self.home_pan + int(round(float(yaw) * self.yaw_to_deg))
+            yaw_input = -float(yaw) if self.invert_yaw else float(yaw)
+            pan = self.home_pan + int(round(yaw_input * self.yaw_to_deg))
             tilt_offset = int(round(float(pitch) * self.pitch_to_deg))
             if self.invert_tilt:
                 tilt_offset = -tilt_offset
