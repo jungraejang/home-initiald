@@ -87,6 +87,8 @@ HTML_PAGE = """<!doctype html>
     const minIntervalMs = 50; // 20Hz
     let xrSession = null;
     let xrRefSpace = null;
+    let xrGl = null;
+    let xrBaseLayer = null;
     let xrActive = false;
     let xrMode = '';
     let xrPreferImmersive = false;
@@ -193,6 +195,16 @@ HTML_PAGE = """<!doctype html>
     function xrFrame(time, frame) {
       if (!xrSession || !xrRefSpace) return;
       xrFrameCount += 1;
+
+      // Keep an active XR render loop; some browsers do not advance
+      // requestAnimationFrame for inline sessions unless a layer is rendered.
+      if (xrGl && xrBaseLayer) {
+        xrGl.bindFramebuffer(xrGl.FRAMEBUFFER, xrBaseLayer.framebuffer);
+        xrGl.viewport(0, 0, xrBaseLayer.framebufferWidth, xrBaseLayer.framebufferHeight);
+        xrGl.clearColor(0, 0, 0, 1);
+        xrGl.clear(xrGl.COLOR_BUFFER_BIT);
+      }
+
       const pose = frame.getViewerPose(xrRefSpace);
       if (pose && pose.views && pose.views.length > 0) {
         xrPoseCount += 1;
@@ -243,13 +255,12 @@ HTML_PAGE = """<!doctype html>
       xrSession = await navigator.xr.requestSession(mode);
       xrMode = mode;
 
-      if (mode === 'immersive-vr') {
-        const canvas = document.getElementById('xrCanvas');
-        const gl = canvas.getContext('webgl', { xrCompatible: true, antialias: false });
-        if (!gl) throw new Error('WebGL unavailable for immersive XR');
-        await gl.makeXRCompatible();
-        xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(xrSession, gl) });
-      }
+      const canvas = document.getElementById('xrCanvas');
+      xrGl = canvas.getContext('webgl', { xrCompatible: true, antialias: false });
+      if (!xrGl) throw new Error('WebGL unavailable for XR');
+      await xrGl.makeXRCompatible();
+      xrBaseLayer = new XRWebGLLayer(xrSession, xrGl);
+      xrSession.updateRenderState({ baseLayer: xrBaseLayer });
 
       if (mode === 'inline') {
         // Inline XR is most reliable with viewer space on Quest browsers.
@@ -286,6 +297,8 @@ HTML_PAGE = """<!doctype html>
       xrSession.addEventListener('end', () => {
         xrSession = null;
         xrRefSpace = null;
+        xrGl = null;
+        xrBaseLayer = null;
         xrActive = false;
         xrMode = '';
         document.getElementById('xrBtn').textContent = 'Start XR Tracking';
@@ -301,6 +314,8 @@ HTML_PAGE = """<!doctype html>
       xrActive = false;
       xrSession = null;
       xrRefSpace = null;
+      xrGl = null;
+      xrBaseLayer = null;
       document.getElementById('xrBtn').textContent = 'Start XR Tracking';
     }
 
