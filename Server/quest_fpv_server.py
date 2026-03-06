@@ -57,7 +57,8 @@ HTML_PAGE = """<!doctype html>
       <div class="panel">
         <div class="row"><strong>Head Tracking (Quest)</strong></div>
         <div class="row">
-          <button id="gyroBtn" onclick="toggleGyro()">Enable Head Tracking</button>
+          <button id="gyroBtn" onclick="toggleGyro()">Enable Gyro Tracking</button>
+          <button id="xrBtn" onclick="toggleXR()">Start XR Tracking</button>
           <button onclick="recenter()">Recenter</button>
         </div>
         <div class="row">
@@ -76,11 +77,14 @@ HTML_PAGE = """<!doctype html>
     let step = 5;
     let gyroEnabled = false;
     let baseAlpha = null, baseBeta = null;
-    let sendTimer = null;
     let currentAlpha = null, currentBeta = null;
     let lastSendTs = 0;
     let orientationEventCount = 0;
     const minIntervalMs = 50; // 20Hz
+    let xrSession = null;
+    let xrRefSpace = null;
+    let xrActive = false;
+    let baseYaw = null, basePitch = null;
 
     const stepRange = document.getElementById('stepRange');
     const stepVal = document.getElementById('stepVal');
@@ -114,6 +118,8 @@ HTML_PAGE = """<!doctype html>
     function recenter() {
       if (currentAlpha != null) baseAlpha = currentAlpha;
       if (currentBeta != null) baseBeta = currentBeta;
+      baseYaw = null;
+      basePitch = null;
       document.getElementById('status').textContent = 'Recentered';
     }
 
@@ -153,6 +159,95 @@ HTML_PAGE = """<!doctype html>
         `Head tracking enabled (alpha=${(currentAlpha ?? 0).toFixed(1)}, beta=${(currentBeta ?? 0).toFixed(1)})`;
     }
 
+    function radToDeg(v) { return v * 180.0 / Math.PI; }
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function quaternionToYawPitch(qx, qy, qz, qw) {
+      const siny_cosp = 2.0 * (qw * qz + qx * qy);
+      const cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz);
+      const yaw = Math.atan2(siny_cosp, cosy_cosp);
+
+      const sinp = 2.0 * (qw * qy - qz * qx);
+      const pitch = Math.asin(clamp(sinp, -1.0, 1.0));
+      return { yawDeg: radToDeg(yaw), pitchDeg: radToDeg(pitch) };
+    }
+
+    function xrFrame(time, frame) {
+      if (!xrSession || !xrRefSpace) return;
+      const pose = frame.getViewerPose(xrRefSpace);
+      if (pose && pose.views && pose.views.length > 0) {
+        const q = pose.views[0].transform.orientation;
+        const yp = quaternionToYawPitch(q.x, q.y, q.z, q.w);
+        if (baseYaw == null || basePitch == null) {
+          baseYaw = yp.yawDeg;
+          basePitch = yp.pitchDeg;
+        }
+
+        const now = Date.now();
+        if (now - lastSendTs >= minIntervalMs) {
+          lastSendTs = now;
+          const dyaw = normalizeDeg(yp.yawDeg - baseYaw);
+          const dpitch = normalizeDeg(yp.pitchDeg - basePitch);
+          const yawSens = parseFloat(yawRange.value);
+          const pitchSens = parseFloat(pitchRange.value);
+          send({
+            mode: 'head',
+            yaw: dyaw * yawSens,
+            pitch: dpitch * pitchSens
+          });
+          document.getElementById('status').textContent =
+            `XR tracking enabled (yaw=${yp.yawDeg.toFixed(1)}, pitch=${yp.pitchDeg.toFixed(1)})`;
+        }
+      }
+      if (xrSession) xrSession.requestAnimationFrame(xrFrame);
+    }
+
+    async function startXR() {
+      if (!navigator.xr) {
+        document.getElementById('status').textContent = 'WebXR not available in this browser';
+        return;
+      }
+      const supported = await navigator.xr.isSessionSupported('immersive-vr');
+      if (!supported) {
+        document.getElementById('status').textContent = 'Immersive VR not supported';
+        return;
+      }
+      xrSession = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
+      xrRefSpace = await xrSession.requestReferenceSpace('local');
+      xrActive = true;
+      document.getElementById('xrBtn').textContent = 'Stop XR Tracking';
+      document.getElementById('status').textContent = 'XR tracking started';
+      baseYaw = null;
+      basePitch = null;
+      xrSession.addEventListener('end', () => {
+        xrSession = null;
+        xrRefSpace = null;
+        xrActive = false;
+        document.getElementById('xrBtn').textContent = 'Start XR Tracking';
+        document.getElementById('status').textContent = 'XR tracking stopped';
+      });
+      xrSession.requestAnimationFrame(xrFrame);
+    }
+
+    async function stopXR() {
+      if (xrSession) {
+        await xrSession.end();
+      }
+      xrActive = false;
+      xrSession = null;
+      xrRefSpace = null;
+      document.getElementById('xrBtn').textContent = 'Start XR Tracking';
+    }
+
+    async function toggleXR() {
+      try {
+        if (!xrActive) await startXR();
+        else await stopXR();
+      } catch (e) {
+        document.getElementById('status').textContent = 'Could not start XR tracking';
+      }
+    }
+
     async function enableGyro() {
       if (typeof DeviceOrientationEvent !== 'undefined' &&
           typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -162,7 +257,7 @@ HTML_PAGE = """<!doctype html>
       window.addEventListener('deviceorientation', onOrientation);
       gyroEnabled = true;
       orientationEventCount = 0;
-      document.getElementById('gyroBtn').textContent = 'Disable Head Tracking';
+      document.getElementById('gyroBtn').textContent = 'Disable Gyro Tracking';
       document.getElementById('status').textContent = 'Head tracking enabled';
       setTimeout(() => {
         if (gyroEnabled && orientationEventCount === 0) {
@@ -175,7 +270,7 @@ HTML_PAGE = """<!doctype html>
     function disableGyro() {
       gyroEnabled = false;
       window.removeEventListener('deviceorientation', onOrientation);
-      document.getElementById('gyroBtn').textContent = 'Enable Head Tracking';
+      document.getElementById('gyroBtn').textContent = 'Enable Gyro Tracking';
       document.getElementById('status').textContent = 'Head tracking disabled';
     }
 

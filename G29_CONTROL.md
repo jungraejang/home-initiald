@@ -159,7 +159,8 @@ http://<PI_IP>:8080
 3. In the page:
 - Video appears from `/stream.mjpg`
 - Manual pan/tilt buttons work immediately
-- Tap **Enable Head Tracking** (browser permission may prompt)
+- Prefer **Start XR Tracking** on Quest 3 (most reliable)
+- `Enable Gyro Tracking` remains as fallback for browsers exposing `DeviceOrientation`
 - Tap **Recenter** while looking forward
 
 Config keys:
