@@ -159,7 +159,7 @@ http://<PI_IP>:8080
 3. In the page:
 - Video appears from `/stream.mjpg`
 - Manual pan/tilt buttons work immediately
-- Prefer **Start XR Tracking** on Quest 3 (inline XR mode, no immersive scene load)
+- Prefer **Start XR Tracking** on Quest 3 (immersive XR mode with in-headset FPV panel)
 - `Enable Gyro Tracking` remains as fallback for browsers exposing `DeviceOrientation`
 - Tap **Recenter** while looking forward
 
@@ -174,8 +174,10 @@ Config keys:
 - `quest_fpv.invert_tilt`
 - `quest_fpv.video_rotate_180` (Quest page-only 180-degree video rotation)
 - `quest_fpv.xr_prefer_immersive` (`true` uses immersive XR; FPV video is rendered into XR layer)
-- `quest_fpv.immersive_square_frame` (`true` renders a centered square frame in immersive mode)
-- `quest_fpv.immersive_frame_scale` (0.2..1.0, size of square immersive frame)
+- `quest_fpv.immersive_rotate_180` (extra immersive-only 180-degree rotation)
+- `quest_fpv.immersive_panel_distance` (panel distance in meters)
+- `quest_fpv.immersive_panel_width` (panel width in meters)
+- `quest_fpv.immersive_panel_height` (panel height in meters, use 16:9 ratio with width)
 
 ### Native HTTPS setup for Quest sensors
 

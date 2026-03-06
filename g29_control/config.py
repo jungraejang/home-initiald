@@ -89,8 +89,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "invert_tilt": False,
         "video_rotate_180": False,
         "xr_prefer_immersive": False,
-        "immersive_square_frame": False,
-        "immersive_frame_scale": 1.0,
+        "immersive_rotate_180": False,
+        "immersive_panel_distance": 1.8,
+        "immersive_panel_width": 1.6,
+        "immersive_panel_height": 0.9,
     },
 }
 
