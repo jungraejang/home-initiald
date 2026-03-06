@@ -83,6 +83,7 @@
     "home_tilt": 90,
     "yaw_to_deg": 0.5,
     "pitch_to_deg": 0.5,
-    "invert_tilt": false
+    "invert_tilt": false,
+    "video_rotate_180": false
   }
 }

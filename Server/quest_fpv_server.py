@@ -78,6 +78,7 @@ HTML_PAGE = """<!doctype html>
     let sendTimer = null;
     let currentAlpha = null, currentBeta = null;
     let lastSendTs = 0;
+    let orientationEventCount = 0;
     const minIntervalMs = 50; // 20Hz
 
     const stepRange = document.getElementById('stepRange');
@@ -122,6 +123,7 @@ HTML_PAGE = """<!doctype html>
     }
 
     function onOrientation(ev) {
+      orientationEventCount += 1;
       currentAlpha = ev.alpha; // yaw-like
       currentBeta = ev.beta;   // pitch-like
       if (!gyroEnabled || currentAlpha == null || currentBeta == null) return;
@@ -146,6 +148,8 @@ HTML_PAGE = """<!doctype html>
         yaw: dyaw * yawSens,
         pitch: dpitch * pitchSens
       });
+      document.getElementById('status').textContent =
+        `Head tracking enabled (alpha=${(currentAlpha ?? 0).toFixed(1)}, beta=${(currentBeta ?? 0).toFixed(1)})`;
     }
 
     async function enableGyro() {
@@ -156,8 +160,15 @@ HTML_PAGE = """<!doctype html>
       }
       window.addEventListener('deviceorientation', onOrientation);
       gyroEnabled = true;
+      orientationEventCount = 0;
       document.getElementById('gyroBtn').textContent = 'Disable Head Tracking';
       document.getElementById('status').textContent = 'Head tracking enabled';
+      setTimeout(() => {
+        if (gyroEnabled && orientationEventCount === 0) {
+          document.getElementById('status').textContent =
+            'No sensor data. In Quest browser, enable Motion Sensors permission for this site.';
+        }
+      }, 3000);
     }
 
     function disableGyro() {
@@ -175,6 +186,17 @@ HTML_PAGE = """<!doctype html>
         document.getElementById('status').textContent = 'Could not enable sensors in browser';
       }
     }
+
+    async function initPage() {
+      try {
+        const r = await fetch('/api/state');
+        const s = await r.json();
+        if (s.video_rotate_180) {
+          document.getElementById('video').style.transform = 'rotate(180deg)';
+        }
+      } catch (_e) {}
+    }
+    initPage();
   </script>
 </body>
 </html>
@@ -195,6 +217,7 @@ class QuestFPVState:
         self.yaw_to_deg = float(qcfg.get("yaw_to_deg", 0.5))
         self.pitch_to_deg = float(qcfg.get("pitch_to_deg", 0.5))
         self.invert_tilt = bool(qcfg.get("invert_tilt", False))
+        self.video_rotate_180 = bool(qcfg.get("video_rotate_180", False))
         self.pan = self.home_pan
         self.tilt = self.home_tilt
         self._lock = threading.Lock()
@@ -236,6 +259,8 @@ class QuestFPVState:
 
     def apply_delta(self, dpan: int, dtilt: int) -> None:
         with self._lock:
+            if self.invert_tilt:
+                dtilt = -int(dtilt)
             self.pan = clamp(self.pan + int(dpan), self.min_angle, self.max_angle)
             self.tilt = clamp(self.tilt + int(dtilt), self.min_angle, self.max_angle)
             self._apply_servo_locked()
@@ -264,6 +289,7 @@ class QuestFPVState:
                 "tilt": self.tilt,
                 "servo_ok": self.servo is not None,
                 "servo_error": self.servo_error,
+                "video_rotate_180": self.video_rotate_180,
             }
 
     def close(self) -> None:

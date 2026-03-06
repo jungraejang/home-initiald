@@ -168,6 +168,7 @@ Config keys:
 - `quest_fpv.home_pan`, `quest_fpv.home_tilt`
 - `quest_fpv.yaw_to_deg`, `quest_fpv.pitch_to_deg`
 - `quest_fpv.invert_tilt`
+- `quest_fpv.video_rotate_180` (Quest page-only 180-degree video rotation)
 
 ## Tuning checklist
 
