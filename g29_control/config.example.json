@@ -90,6 +90,8 @@
     "pitch_to_deg": 0.5,
     "invert_tilt": false,
     "video_rotate_180": false,
-    "xr_prefer_immersive": false
+    "xr_prefer_immersive": false,
+    "immersive_square_frame": true,
+    "immersive_frame_scale": 0.9
   }
 }

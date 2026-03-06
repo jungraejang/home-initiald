@@ -95,6 +95,9 @@ HTML_PAGE = """<!doctype html>
     let xrUvBuffer = null;
     let xrTexture = null;
     let xrVideoEl = null;
+    let videoRotate180 = false;
+    let immersiveSquareFrame = true;
+    let immersiveFrameScale = 0.9;
     let xrActive = false;
     let xrMode = '';
     let xrPreferImmersive = false;
@@ -217,6 +220,7 @@ HTML_PAGE = """<!doctype html>
         xrGl.clearColor(0, 0, 0, 1);
         xrGl.clear(xrGl.COLOR_BUFFER_BIT);
         if (xrMode === 'immersive-vr') {
+            updateXrQuadGeometry(xrBaseLayer.framebufferWidth, xrBaseLayer.framebufferHeight);
           renderVideoToXr();
         }
       }
@@ -371,6 +375,8 @@ xrPoses: ${xrPoseCount}
 xrNullPoses: ${xrNullPoseCount}
 xrLastError: ${xrLastError || '-'}
 q(x,y,z,w): ${lastQ.x.toFixed(3)}, ${lastQ.y.toFixed(3)}, ${lastQ.z.toFixed(3)}, ${lastQ.w.toFixed(3)}
+immersiveSquareFrame: ${immersiveSquareFrame}
+immersiveFrameScale: ${immersiveFrameScale}
 gyroEvents: ${orientationEventCount}
 headPacketsSent: ${headPacketsSent}
 manualPacketsSent: ${manualPacketsSent}
@@ -420,6 +426,9 @@ servoOk: ${st.servo_ok ?? '-'}`;
         const s = await r.json();
         window._lastServoState = s;
         xrPreferImmersive = !!s.xr_prefer_immersive;
+        videoRotate180 = !!s.video_rotate_180;
+        immersiveSquareFrame = !!s.immersive_square_frame;
+        immersiveFrameScale = Number(s.immersive_frame_scale ?? 0.9);
         xrVideoEl = document.getElementById('video');
         if (s.video_rotate_180) {
           document.getElementById('video').style.transform = 'rotate(180deg)';
@@ -473,19 +482,49 @@ servoOk: ${st.servo_ok ?? '-'}`;
         -1,  1,  1, -1,   1, 1
       ]), gl.STATIC_DRAW);
       xrUvBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, xrUvBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-         0, 1,  1, 1,  0, 0,
-         0, 0,  1, 1,  1, 0
-      ]), gl.STATIC_DRAW);
+      updateXrUvBuffer();
       xrTexture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, xrTexture);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE,
         new Uint8Array([0,0,0,255, 0,0,0,255, 0,0,0,255, 0,0,0,255]));
+    }
+
+    function updateXrUvBuffer() {
+      if (!xrGl || !xrUvBuffer) return;
+      const uv = videoRotate180
+        ? new Float32Array([
+            1, 0,  0, 0,  1, 1,
+            1, 1,  0, 0,  0, 1
+          ])
+        : new Float32Array([
+            0, 1,  1, 1,  0, 0,
+            0, 0,  1, 1,  1, 0
+          ]);
+      xrGl.bindBuffer(xrGl.ARRAY_BUFFER, xrUvBuffer);
+      xrGl.bufferData(xrGl.ARRAY_BUFFER, uv, xrGl.STATIC_DRAW);
+    }
+
+    function updateXrQuadGeometry(frameW, frameH) {
+      if (!xrGl || !xrPosBuffer) return;
+      let halfW = 1.0;
+      let halfH = 1.0;
+      if (immersiveSquareFrame) {
+        const scale = clamp(immersiveFrameScale, 0.2, 1.0);
+        const squarePx = Math.min(frameW, frameH) * scale;
+        halfW = squarePx / frameW;
+        halfH = squarePx / frameH;
+      }
+      const verts = new Float32Array([
+        -halfW, -halfH,   halfW, -halfH,  -halfW,  halfH,
+        -halfW,  halfH,   halfW, -halfH,   halfW,  halfH
+      ]);
+      xrGl.bindBuffer(xrGl.ARRAY_BUFFER, xrPosBuffer);
+      xrGl.bufferData(xrGl.ARRAY_BUFFER, verts, xrGl.DYNAMIC_DRAW);
     }
 
     function renderVideoToXr() {
@@ -534,6 +573,8 @@ class QuestFPVState:
         self.invert_tilt = bool(qcfg.get("invert_tilt", False))
         self.video_rotate_180 = bool(qcfg.get("video_rotate_180", False))
         self.xr_prefer_immersive = bool(qcfg.get("xr_prefer_immersive", False))
+        self.immersive_square_frame = bool(qcfg.get("immersive_square_frame", True))
+        self.immersive_frame_scale = float(qcfg.get("immersive_frame_scale", 0.9))
         self.pan = self.home_pan
         self.tilt = self.home_tilt
         self._lock = threading.Lock()
@@ -607,6 +648,8 @@ class QuestFPVState:
                 "servo_error": self.servo_error,
                 "video_rotate_180": self.video_rotate_180,
                 "xr_prefer_immersive": self.xr_prefer_immersive,
+                "immersive_square_frame": self.immersive_square_frame,
+                "immersive_frame_scale": self.immersive_frame_scale,
             }
 
     def close(self) -> None:

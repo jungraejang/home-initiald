@@ -174,6 +174,8 @@ Config keys:
 - `quest_fpv.invert_tilt`
 - `quest_fpv.video_rotate_180` (Quest page-only 180-degree video rotation)
 - `quest_fpv.xr_prefer_immersive` (`true` uses immersive XR; FPV video is rendered into XR layer)
+- `quest_fpv.immersive_square_frame` (`true` renders a centered square frame in immersive mode)
+- `quest_fpv.immersive_frame_scale` (0.2..1.0, size of square immersive frame)
 
 ### Native HTTPS setup for Quest sensors
 
