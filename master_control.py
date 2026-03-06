@@ -119,10 +119,16 @@ def main() -> None:
                         sys.exit(code if code != 0 else 0)
                     # Optional process failed: keep required control processes running.
                     if spec.name in {"camera_viewer", "camera_server"} and code != 0:
-                        print(
-                            f"[warn] {spec.name} failed. If this is missing dependency, "
-                            "install: pip install opencv-python"
-                        )
+                        if spec.name == "camera_viewer":
+                            print(
+                                "[warn] camera_viewer failed. If cv2 is missing, run: "
+                                "python -m pip install opencv-python"
+                            )
+                        else:
+                            print(
+                                "[warn] camera_server failed. Check Pi camera detection with: "
+                                "libcamera-hello --list-cameras"
+                            )
                     processes = [(s, p) for s, p in processes if p is not proc]
             time.sleep(0.2)
     finally:

@@ -23,7 +23,17 @@ def run_server(config_path: str) -> None:
     hflip = bool(cam_cfg.get("hflip", False))
     vflip = bool(cam_cfg.get("vflip", False))
 
-    camera = Camera(stream_size=(width, height), hflip=hflip, vflip=vflip)
+    try:
+        camera = Camera(stream_size=(width, height), hflip=hflip, vflip=vflip)
+    except Exception as exc:
+        print("Failed to initialize Pi camera stream.")
+        print(f"Reason: {exc}")
+        print("Checks:")
+        print("1) Verify camera is connected to CSI port and ribbon orientation is correct.")
+        print("2) Run: libcamera-hello --list-cameras")
+        print("3) Make sure camera interface is enabled and reboot Pi if you changed settings.")
+        print("4) Stop other processes using camera (only one owner at a time).")
+        raise
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((host, port))
