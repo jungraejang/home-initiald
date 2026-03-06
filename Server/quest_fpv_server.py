@@ -34,6 +34,7 @@ HTML_PAGE = """<!doctype html>
     button { font-size: 16px; padding: 10px 12px; border-radius: 8px; border: 1px solid #666; background: #222; color: #fff; }
     input[type=range] { width: 140px; }
     #status { font-size: 14px; color: #9f9; }
+    #diag { font-size: 12px; color: #ddd; white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -70,6 +71,7 @@ HTML_PAGE = """<!doctype html>
           <span id="pitchVal">1.0</span>
         </div>
         <div id="status">Head tracking disabled</div>
+        <div id="diag"></div>
       </div>
     </div>
   </div>
@@ -80,6 +82,7 @@ HTML_PAGE = """<!doctype html>
     let currentAlpha = null, currentBeta = null;
     let lastSendTs = 0;
     let orientationEventCount = 0;
+    let headPacketsSent = 0;
     const minIntervalMs = 50; // 20Hz
     let xrSession = null;
     let xrRefSpace = null;
@@ -99,11 +102,18 @@ HTML_PAGE = """<!doctype html>
 
     async function send(payload) {
       try {
-        await fetch('/api/servo', {
+        const resp = await fetch('/api/servo', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify(payload)
         });
+        if (payload.mode === 'head') {
+          headPacketsSent += 1;
+        }
+        try {
+          const data = await resp.json();
+          window._lastServoState = data;
+        } catch (_e) {}
       } catch (e) {}
     }
 
@@ -258,6 +268,22 @@ HTML_PAGE = """<!doctype html>
       }
     }
 
+    function updateDiag() {
+      const secure = window.isSecureContext;
+      const hasXR = !!navigator.xr;
+      const gyroApi = typeof DeviceOrientationEvent !== 'undefined';
+      const st = window._lastServoState || {};
+      const txt =
+`secureContext: ${secure}
+navigator.xr: ${hasXR}
+deviceOrientationApi: ${gyroApi}
+gyroEvents: ${orientationEventCount}
+headPacketsSent: ${headPacketsSent}
+servoPanTilt: ${st.pan ?? '-'}, ${st.tilt ?? '-'}
+servoOk: ${st.servo_ok ?? '-'}`;
+      document.getElementById('diag').textContent = txt;
+    }
+
     async function enableGyro() {
       if (typeof DeviceOrientationEvent !== 'undefined' &&
           typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -297,10 +323,13 @@ HTML_PAGE = """<!doctype html>
       try {
         const r = await fetch('/api/state');
         const s = await r.json();
+        window._lastServoState = s;
         if (s.video_rotate_180) {
           document.getElementById('video').style.transform = 'rotate(180deg)';
         }
       } catch (_e) {}
+      updateDiag();
+      setInterval(updateDiag, 1000);
     }
     initPage();
   </script>
