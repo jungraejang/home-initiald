@@ -212,22 +212,20 @@ HTML_PAGE = """<!doctype html>
       if (!xrSession || !xrRefSpace) return;
       xrFrameCount += 1;
 
-      // Keep an active XR render loop; some browsers do not advance
-      // requestAnimationFrame for inline sessions unless a layer is rendered.
+      // Keep an active XR render loop.
       if (xrGl && xrBaseLayer) {
         xrGl.bindFramebuffer(xrGl.FRAMEBUFFER, xrBaseLayer.framebuffer);
         xrGl.viewport(0, 0, xrBaseLayer.framebufferWidth, xrBaseLayer.framebufferHeight);
         xrGl.clearColor(0, 0, 0, 1);
         xrGl.clear(xrGl.COLOR_BUFFER_BIT);
-        if (xrMode === 'immersive-vr') {
-            updateXrQuadGeometry(xrBaseLayer.framebufferWidth, xrBaseLayer.framebufferHeight);
-          renderVideoToXr();
-        }
       }
 
       const pose = frame.getViewerPose(xrRefSpace);
       if (pose && pose.views && pose.views.length > 0) {
         xrPoseCount += 1;
+        if (xrMode === 'immersive-vr') {
+          renderVideoToXr(frame, pose);
+        }
         const q = pose.views[0].transform.orientation;
         lastQ = {x: q.x, y: q.y, z: q.z, w: q.w};
         const yp = quaternionToYawPitch(q.x, q.y, q.z, q.w);
@@ -527,9 +525,9 @@ servoOk: ${st.servo_ok ?? '-'}`;
       xrGl.bufferData(xrGl.ARRAY_BUFFER, verts, xrGl.DYNAMIC_DRAW);
     }
 
-    function renderVideoToXr() {
+    function renderVideoToXr(frame, pose) {
       const gl = xrGl;
-      if (!gl || !xrProgram || !xrTexture || !xrVideoEl) return;
+      if (!gl || !xrBaseLayer || !xrProgram || !xrTexture || !xrVideoEl || !pose) return;
       gl.useProgram(xrProgram);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, xrTexture);
@@ -542,13 +540,20 @@ servoOk: ${st.servo_ok ?? '-'}`;
       const texLoc = gl.getUniformLocation(xrProgram, 'uTex');
       gl.uniform1i(texLoc, 0);
 
-      gl.bindBuffer(gl.ARRAY_BUFFER, xrPosBuffer);
-      gl.enableVertexAttribArray(posLoc);
-      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
       gl.bindBuffer(gl.ARRAY_BUFFER, xrUvBuffer);
       gl.enableVertexAttribArray(uvLoc);
       gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 0, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      for (const view of pose.views) {
+        const vp = xrBaseLayer.getViewport(view);
+        if (!vp) continue;
+        gl.viewport(vp.x, vp.y, vp.width, vp.height);
+        updateXrQuadGeometry(vp.width, vp.height);
+        gl.bindBuffer(gl.ARRAY_BUFFER, xrPosBuffer);
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
     }
     initPage();
   </script>
