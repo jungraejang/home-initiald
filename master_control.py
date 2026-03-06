@@ -38,13 +38,13 @@ def stop_processes(processes: list[tuple[str, subprocess.Popen]]) -> None:
                 proc.kill()
 
 
-def role_commands(role: str, config: str, no_camera: bool) -> list[ProcessSpec]:
+def role_commands(role: str, config: str, no_camera: bool, quest_fpv: bool) -> list[ProcessSpec]:
     py = sys.executable
     if role == "pc":
         specs = [
             ProcessSpec("g29_sender", [py, "Client/g29_sender.py", "--config", config], True),
         ]
-        if not no_camera:
+        if not no_camera and not quest_fpv:
             specs.append(
                 ProcessSpec("camera_viewer", [py, "Client/camera_stream_client.py", "--config", config], False)
             )
@@ -57,12 +57,17 @@ def role_commands(role: str, config: str, no_camera: bool) -> list[ProcessSpec]:
             ProcessSpec("g29_receiver", [py, "Server/g29_receiver.py", "--config", config], True),
         ]
         if not no_camera:
-            specs.append(
-                ProcessSpec("camera_server", [py, "Server/camera_stream_server.py", "--config", config], False)
-            )
-            specs.append(
-                ProcessSpec("servo_server", [py, "Server/servo_control_server.py", "--config", config], False)
-            )
+            if quest_fpv:
+                specs.append(
+                    ProcessSpec("quest_fpv_server", [py, "Server/quest_fpv_server.py", "--config", config], False)
+                )
+            else:
+                specs.append(
+                    ProcessSpec("camera_server", [py, "Server/camera_stream_server.py", "--config", config], False)
+                )
+                specs.append(
+                    ProcessSpec("servo_server", [py, "Server/servo_control_server.py", "--config", config], False)
+                )
         return specs
     if role == "all":
         specs = [
@@ -70,18 +75,23 @@ def role_commands(role: str, config: str, no_camera: bool) -> list[ProcessSpec]:
             ProcessSpec("g29_sender", [py, "Client/g29_sender.py", "--config", config], True),
         ]
         if not no_camera:
-            specs.append(
-                ProcessSpec("camera_server", [py, "Server/camera_stream_server.py", "--config", config], False)
-            )
-            specs.append(
-                ProcessSpec("servo_server", [py, "Server/servo_control_server.py", "--config", config], False)
-            )
-            specs.append(
-                ProcessSpec("camera_viewer", [py, "Client/camera_stream_client.py", "--config", config], False)
-            )
-            specs.append(
-                ProcessSpec("camera_servo_ui", [py, "Client/camera_servo_ui.py", "--config", config], False)
-            )
+            if quest_fpv:
+                specs.append(
+                    ProcessSpec("quest_fpv_server", [py, "Server/quest_fpv_server.py", "--config", config], False)
+                )
+            else:
+                specs.append(
+                    ProcessSpec("camera_server", [py, "Server/camera_stream_server.py", "--config", config], False)
+                )
+                specs.append(
+                    ProcessSpec("servo_server", [py, "Server/servo_control_server.py", "--config", config], False)
+                )
+                specs.append(
+                    ProcessSpec("camera_viewer", [py, "Client/camera_stream_client.py", "--config", config], False)
+                )
+                specs.append(
+                    ProcessSpec("camera_servo_ui", [py, "Client/camera_servo_ui.py", "--config", config], False)
+                )
         return specs
     raise ValueError(f"Unsupported role: {role}")
 
@@ -98,9 +108,14 @@ def main() -> None:
     )
     parser.add_argument("--config", default=DEFAULT_CONFIG, help="Path to config json")
     parser.add_argument("--no-camera", action="store_true", help="Skip camera processes")
+    parser.add_argument(
+        "--quest-fpv",
+        action="store_true",
+        help="On Pi, run Quest FPV web server instead of PC camera viewer + servo UI stack",
+    )
     args = parser.parse_args()
 
-    commands = role_commands(args.role, args.config, args.no_camera)
+    commands = role_commands(args.role, args.config, args.no_camera, args.quest_fpv)
     processes: list[tuple[ProcessSpec, subprocess.Popen]] = []
     stopping = False
 
@@ -130,11 +145,16 @@ def main() -> None:
                         stop_processes([(s.name, p) for s, p in processes])
                         sys.exit(code if code != 0 else 0)
                     # Optional process failed: keep required control processes running.
-                    if spec.name in {"camera_viewer", "camera_server", "servo_server"} and code != 0:
+                    if spec.name in {"camera_viewer", "camera_server", "servo_server", "quest_fpv_server"} and code != 0:
                         if spec.name == "camera_viewer":
                             print(
                                 "[warn] camera_viewer failed. If cv2 is missing, run: "
                                 "python -m pip install opencv-python"
+                            )
+                        elif spec.name == "quest_fpv_server":
+                            print(
+                                "[warn] quest_fpv_server failed. Check camera with "
+                                "libcamera-hello --list-cameras and I2C with sudo i2cdetect -y 1"
                             )
                         elif spec.name == "servo_server":
                             print(

@@ -79,6 +79,7 @@ Modes:
 - `--role pc`: starts `Client/g29_sender.py` + `Client/camera_stream_client.py` + `Client/camera_servo_ui.py`
 - `--role all`: starts everything on one machine (debug/testing only)
 - `--no-camera`: run control only (skip camera processes)
+- `--quest-fpv`: run Quest web FPV server on Pi instead of legacy PC camera/servo UI stack
 
 Press `Ctrl+C` in the master terminal to stop all child processes together.
 
@@ -140,6 +141,33 @@ When running PC master mode, `Client/camera_servo_ui.py` opens a small arrow-but
 - Left/Right: pan servo
 - Home button (or keyboard `H`): return to configured home angles
 - Arrow keys also work when the window is focused
+
+## Quest 3 DIY FPV (first working version)
+
+1. Start Pi with Quest FPV mode:
+
+```bash
+python3 master_control.py --role pi --config g29_control/config.json --quest-fpv
+```
+
+2. On Quest browser, open:
+
+```text
+http://<PI_IP>:8080
+```
+
+3. In the page:
+- Video appears from `/stream.mjpg`
+- Manual pan/tilt buttons work immediately
+- Tap **Enable Head Tracking** (browser permission may prompt)
+- Tap **Recenter** while looking forward
+
+Config keys:
+- `quest_fpv.host`, `quest_fpv.port`
+- `quest_fpv.pan_channel`, `quest_fpv.tilt_channel`
+- `quest_fpv.home_pan`, `quest_fpv.home_tilt`
+- `quest_fpv.yaw_to_deg`, `quest_fpv.pitch_to_deg`
+- `quest_fpv.invert_tilt`
 
 ## Tuning checklist
 

@@ -71,5 +71,18 @@
     "max_angle": 180,
     "home_pan": 90,
     "home_tilt": 90
+  },
+  "quest_fpv": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "pan_channel": "0",
+    "tilt_channel": "1",
+    "min_angle": 0,
+    "max_angle": 180,
+    "home_pan": 90,
+    "home_tilt": 90,
+    "yaw_to_deg": 0.5,
+    "pitch_to_deg": 0.5,
+    "invert_tilt": false
   }
 }
