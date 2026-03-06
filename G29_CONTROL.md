@@ -176,6 +176,7 @@ Config keys:
 - `quest_fpv.video_rotate_180` (Quest page-only 180-degree video rotation)
 - `quest_fpv.xr_prefer_immersive` (`true` uses immersive XR; FPV video is rendered into XR layer)
 - `quest_fpv.immersive_rotate_180` (extra immersive-only 180-degree rotation)
+- `quest_fpv.immersive_mirror_horizontal` (flip immersive panel left/right)
 - `quest_fpv.immersive_panel_distance` (panel distance in meters)
 - `quest_fpv.immersive_panel_width` (panel width in meters)
 - `quest_fpv.immersive_panel_height` (panel height in meters, use 16:9 ratio with width)

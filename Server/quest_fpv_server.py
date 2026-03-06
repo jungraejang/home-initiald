@@ -97,6 +97,7 @@ HTML_PAGE = """<!doctype html>
     let xrVideoEl = null;
     let videoRotate180 = false;
     let immersiveRotate180 = false;
+    let immersiveMirrorHorizontal = false;
     let immersivePanelDistance = 1.8;
     let immersivePanelWidth = 1.6;
     let immersivePanelHeight = 0.9;
@@ -378,6 +379,7 @@ q(x,y,z,w): ${lastQ.x.toFixed(3)}, ${lastQ.y.toFixed(3)}, ${lastQ.z.toFixed(3)},
 immersivePanelDistance: ${immersivePanelDistance}
 immersivePanelWidth: ${immersivePanelWidth}
 immersivePanelHeight: ${immersivePanelHeight}
+immersiveMirrorHorizontal: ${immersiveMirrorHorizontal}
 gyroEvents: ${orientationEventCount}
 headPacketsSent: ${headPacketsSent}
 manualPacketsSent: ${manualPacketsSent}
@@ -429,6 +431,7 @@ servoOk: ${st.servo_ok ?? '-'}`;
         xrPreferImmersive = !!s.xr_prefer_immersive;
         videoRotate180 = !!s.video_rotate_180;
         immersiveRotate180 = !!s.immersive_rotate_180;
+        immersiveMirrorHorizontal = !!s.immersive_mirror_horizontal;
         immersivePanelDistance = Number(s.immersive_panel_distance ?? 1.8);
         immersivePanelWidth = Number(s.immersive_panel_width ?? 1.6);
         immersivePanelHeight = Number(s.immersive_panel_height ?? 0.9);
@@ -497,15 +500,24 @@ servoOk: ${st.servo_ok ?? '-'}`;
     function updateXrUvBuffer() {
       if (!xrGl || !xrUvBuffer) return;
       const rotate180 = !!immersiveRotate180;
-      const uv = rotate180
-        ? new Float32Array([
-            1, 0,  0, 0,  1, 1,
-            1, 1,  0, 0,  0, 1
-          ])
-        : new Float32Array([
-            0, 1,  1, 1,  0, 0,
-            0, 0,  1, 1,  1, 0
-          ]);
+      const mirrorX = !!immersiveMirrorHorizontal;
+      const base = [
+        [0, 1], [1, 1], [0, 0],
+        [0, 0], [1, 1], [1, 0]
+      ];
+      const transformed = base.map(([u0, v0]) => {
+        let u = u0;
+        let v = v0;
+        if (rotate180) {
+          u = 1 - u;
+          v = 1 - v;
+        }
+        if (mirrorX) {
+          u = 1 - u;
+        }
+        return [u, v];
+      });
+      const uv = new Float32Array(transformed.flat());
       xrGl.bindBuffer(xrGl.ARRAY_BUFFER, xrUvBuffer);
       xrGl.bufferData(xrGl.ARRAY_BUFFER, uv, xrGl.STATIC_DRAW);
     }
@@ -585,6 +597,7 @@ class QuestFPVState:
         self.video_rotate_180 = bool(qcfg.get("video_rotate_180", False))
         self.xr_prefer_immersive = bool(qcfg.get("xr_prefer_immersive", False))
         self.immersive_rotate_180 = bool(qcfg.get("immersive_rotate_180", False))
+        self.immersive_mirror_horizontal = bool(qcfg.get("immersive_mirror_horizontal", False))
         self.immersive_panel_distance = float(qcfg.get("immersive_panel_distance", 1.8))
         self.immersive_panel_width = float(qcfg.get("immersive_panel_width", 1.6))
         self.immersive_panel_height = float(qcfg.get("immersive_panel_height", 0.9))
@@ -663,6 +676,7 @@ class QuestFPVState:
                 "video_rotate_180": self.video_rotate_180,
                 "xr_prefer_immersive": self.xr_prefer_immersive,
                 "immersive_rotate_180": self.immersive_rotate_180,
+                "immersive_mirror_horizontal": self.immersive_mirror_horizontal,
                 "immersive_panel_distance": self.immersive_panel_distance,
                 "immersive_panel_width": self.immersive_panel_width,
                 "immersive_panel_height": self.immersive_panel_height,

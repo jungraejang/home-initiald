@@ -93,6 +93,7 @@
     "video_rotate_180": false,
     "xr_prefer_immersive": false,
     "immersive_rotate_180": false,
+    "immersive_mirror_horizontal": false,
     "immersive_panel_distance": 1.8,
     "immersive_panel_width": 1.6,
     "immersive_panel_height": 0.9
