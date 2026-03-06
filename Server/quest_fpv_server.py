@@ -496,7 +496,7 @@ servoOk: ${st.servo_ok ?? '-'}`;
 
     function updateXrUvBuffer() {
       if (!xrGl || !xrUvBuffer) return;
-      const rotate180 = !!(videoRotate180 || immersiveRotate180);
+      const rotate180 = !!immersiveRotate180;
       const uv = rotate180
         ? new Float32Array([
             1, 0,  0, 0,  1, 1,

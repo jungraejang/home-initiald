@@ -91,7 +91,7 @@
     "invert_tilt": true,
     "video_rotate_180": true,
     "xr_prefer_immersive": true,
-    "immersive_rotate_180": true,
+    "immersive_rotate_180": false,
     "immersive_panel_distance": 1.8,
     "immersive_panel_width": 1.6,
     "immersive_panel_height": 0.9
